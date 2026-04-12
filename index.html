@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Касса - GitHub Pages</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Касса со сканером</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -13,22 +13,46 @@
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
-            padding: 30px;
+            padding: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        h1 { color: #333; margin-bottom: 20px; }
-        h2 { color: #555; margin: 20px 0 15px 0; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
-        .qr-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            text-align: center;
+        h1, h2 { color: #333; margin-bottom: 15px; }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
         }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
         button {
             background: #667eea;
             color: white;
@@ -39,7 +63,14 @@
             font-size: 16px;
             margin: 5px;
         }
-        button:hover { background: #5a67d8; transform: translateY(-2px); }
+        button:hover { background: #5a67d8; }
+        .camera-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            font-size: 20px;
+            padding: 20px;
+            width: 100%;
+            margin: 10px 0;
+        }
         .cart-item, .product-item {
             display: flex;
             justify-content: space-between;
@@ -47,6 +78,26 @@
             border-bottom: 1px solid #ddd;
         }
         .clear-btn { background: #dc3545; }
+        .barcode-input input {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .test-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .test-btn {
+            background: #6c757d;
+            flex: 1;
+            padding: 10px;
+        }
         .modal {
             position: fixed;
             top: 0;
@@ -88,47 +139,90 @@
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
-        .connection-status {
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 8px;
+        .last-scan {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f0f0f0;
+            border-radius: 10px;
             text-align: center;
+            font-family: monospace;
         }
-        .connected { background: #d4edda; color: #155724; }
-        .disconnected { background: #f8d7da; color: #721c24; }
+        .info {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e7f3ff;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 15px; }
+            button { padding: 10px 16px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏪 Касса</h1>
+        <h1>🏪 Касса со сканером</h1>
         
-        <div id="connectionStatus" class="connection-status disconnected">
-            🔴 Ожидание подключения сканера...
+        <!-- Вкладки -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('cashier')">💻 Кассир</button>
+            <button class="tab" onclick="switchTab('scanner')">📷 Сканер (телефон)</button>
         </div>
         
-        <div class="qr-section">
-            <h3>📱 Подключение сканера</h3>
-            <button onclick="showQR()">Показать QR код для телефона</button>
-            <div id="qrContainer" style="display:none; margin-top:20px;">
-                <img id="qrImage" src="" alt="QR Code">
-                <p>Отсканируйте QR код телефоном</p>
-                <p><small>Телефон должен быть в той же WiFi сети</small></p>
+        <!-- Вкладка Кассира -->
+        <div id="cashierTab" class="tab-content active">
+            <div id="connectionStatus" class="status disconnected">
+                🔴 Ожидание подключения сканера...
             </div>
-        </div>
-        
-        <div class="cart-section">
+            
             <h2>🛒 Текущий чек</h2>
             <div id="cartItems"></div>
             <div id="cartTotal"></div>
             <button onclick="clearCart()" class="clear-btn">Очистить чек</button>
-        </div>
-        
-        <div class="products-section">
+            
             <h2>📦 База товаров</h2>
             <div id="productsList"></div>
         </div>
+        
+        <!-- Вкладка Сканера -->
+        <div id="scannerTab" class="tab-content">
+            <div id="scannerStatus" class="status disconnected">
+                🔴 Ожидание подключения...
+            </div>
+            
+            <button class="camera-btn" onclick="openCamera()">
+                📸 Открыть камеру и сканировать
+            </button>
+            
+            <div class="barcode-input">
+                <input type="text" id="manualBarcode" placeholder="Или введи штрихкод вручную">
+                <button onclick="sendManualScan()" style="width:100%">Отправить</button>
+            </div>
+            
+            <div class="test-buttons">
+                <button class="test-btn" onclick="sendBarcode('4601234567890')">🥛 Молоко</button>
+                <button class="test-btn" onclick="sendBarcode('6901234567892')">🍞 Хлеб</button>
+                <button class="test-btn" onclick="sendBarcode('4812345678901')">🍎 Яблоки</button>
+                <button class="test-btn" onclick="sendBarcode('9999999999999')">❓ Новый</button>
+            </div>
+            
+            <div class="last-scan" id="lastScan">
+                Последний скан: --
+            </div>
+            
+            <div class="info">
+                💡 <strong>Как сканировать:</strong><br>
+                1. Нажми на зеленую кнопку "Открыть камеру"<br>
+                2. Сфотографируй любой штрихкод<br>
+                3. Автоматически добавится в чек!<br>
+                <br>
+                🔄 Данные синхронизируются автоматически
+            </div>
+        </div>
     </div>
     
+    <!-- Модальное окно для нового товара -->
     <div id="productModal" class="modal" style="display:none">
         <div class="modal-content">
             <h3>Новый товар</h3>
@@ -139,9 +233,10 @@
             <button onclick="closeModal()">Отмена</button>
         </div>
     </div>
-    
+
+    <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
     <script>
-        // Хранилище (в localStorage)
+        // ============ ХРАНИЛИЩЕ ДАННЫХ ============
         let productDB = JSON.parse(localStorage.getItem('productDB')) || {
             "4601234567890": { name: "Молоко", price: 79.90, barcode: "4601234567890" },
             "6901234567892": { name: "Хлеб", price: 45.00, barcode: "6901234567892" },
@@ -149,54 +244,69 @@
         };
         
         let currentCart = JSON.parse(localStorage.getItem('currentCart')) || [];
-        let peerConnection = null;
-        let dataChannel = null;
+        let pendingBarcode = null;
         
-        function saveData() {
+        // ============ СИНХРОНИЗАЦИЯ МЕЖДУ ВКЛАДКАМИ ============
+        function syncData() {
             localStorage.setItem('productDB', JSON.stringify(productDB));
             localStorage.setItem('currentCart', JSON.stringify(currentCart));
+            updateCashierDisplay();
+            
+            // Оповещаем другие вкладки
+            localStorage.setItem('syncTrigger', Date.now().toString());
         }
         
-        async function showQR() {
-            // Создаем Peer ID для подключения
-            const peerId = 'cashier_' + Math.random().toString(36).substr(2, 9);
+        // Слушаем изменения в localStorage
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'productDB') {
+                productDB = JSON.parse(e.newValue);
+                updateCashierDisplay();
+            }
+            if (e.key === 'currentCart') {
+                currentCart = JSON.parse(e.newValue);
+                updateCashierDisplay();
+            }
+            if (e.key === 'syncTrigger') {
+                updateCashierDisplay();
+            }
+        });
+        
+        // ============ ОТОБРАЖЕНИЕ КАССЫ ============
+        function updateCashierDisplay() {
+            // Обновляем корзину
+            const cartContainer = document.getElementById('cartItems');
+            let total = 0;
             
-            // Инициализируем PeerJS
-            const peer = new Peer(peerId);
+            if (currentCart.length === 0) {
+                cartContainer.innerHTML = '<p>Корзина пуста</p>';
+                document.getElementById('cartTotal').innerHTML = '';
+            } else {
+                cartContainer.innerHTML = currentCart.map(item => {
+                    total += item.price;
+                    return `<div class="cart-item"><span>${item.name}</span><span>${item.price} руб.</span></div>`;
+                }).join('');
+                document.getElementById('cartTotal').innerHTML = `<h3>Итого: ${total.toFixed(2)} руб.</h3>`;
+            }
             
-            peer.on('connection', (conn) => {
-                dataChannel = conn;
-                document.getElementById('connectionStatus').innerHTML = '🟢 Сканер подключен!';
-                document.getElementById('connectionStatus').className = 'connection-status connected';
-                
-                conn.on('data', (data) => {
-                    const message = JSON.parse(data);
-                    handleScan(message.barcode);
-                });
-                
-                conn.on('close', () => {
-                    document.getElementById('connectionStatus').innerHTML = '🔴 Сканер отключен';
-                    document.getElementById('connectionStatus').className = 'connection-status disconnected';
-                });
-            });
-            
-            // Генерируем QR код со ссылкой на сканер
-            const scannerUrl = `${window.location.origin}/scanner.html?peerId=${peerId}`;
-            const QRCodeLib = await import('https://cdn.skypack.dev/qrcode');
-            const qr = await QRCodeLib.toDataURL(scannerUrl);
-            
-            document.getElementById('qrImage').src = qr;
-            document.getElementById('qrContainer').style.display = 'block';
+            // Обновляем список товаров
+            const productsContainer = document.getElementById('productsList');
+            productsContainer.innerHTML = Object.values(productDB).map(p => `
+                <div class="product-item">
+                    <span>${p.name}</span>
+                    <span>${p.price} руб.</span>
+                    <span style="font-size:12px; color:#999;">${p.barcode}</span>
+                </div>
+            `).join('');
         }
         
+        // ============ ОБРАБОТКА СКАНА ============
         function handleScan(barcode) {
             let product = productDB[barcode];
             
             if (product) {
                 currentCart.push(product);
-                updateCart();
+                syncData();
                 showNotification(`✅ ${product.name} - ${product.price} руб.`);
-                saveData();
             } else {
                 pendingBarcode = barcode;
                 document.getElementById('newBarcode').textContent = barcode;
@@ -207,52 +317,20 @@
         function addNewProduct() {
             const name = document.getElementById('productName').value;
             const price = parseFloat(document.getElementById('productPrice').value);
-            const barcode = document.getElementById('newBarcode').textContent;
+            const barcode = pendingBarcode;
             
             if (name && price) {
                 productDB[barcode] = { name, price, barcode };
                 currentCart.push(productDB[barcode]);
-                updateCart();
-                updateProductsList();
+                syncData();
                 closeModal();
                 showNotification(`✅ Добавлен товар: ${name}`);
-                saveData();
             }
-        }
-        
-        function updateCart() {
-            const container = document.getElementById('cartItems');
-            let total = 0;
-            
-            if (currentCart.length === 0) {
-                container.innerHTML = '<p>Корзина пуста</p>';
-                document.getElementById('cartTotal').innerHTML = '';
-                return;
-            }
-            
-            container.innerHTML = currentCart.map(item => {
-                total += item.price;
-                return `<div class="cart-item"><span>${item.name}</span><span>${item.price} руб.</span></div>`;
-            }).join('');
-            
-            document.getElementById('cartTotal').innerHTML = `<h3>Итого: ${total.toFixed(2)} руб.</h3>`;
-        }
-        
-        function updateProductsList() {
-            const container = document.getElementById('productsList');
-            container.innerHTML = Object.values(productDB).map(p => `
-                <div class="product-item">
-                    <span>${p.name}</span>
-                    <span>${p.price} руб.</span>
-                    <span class="barcode">${p.barcode}</span>
-                </div>
-            `).join('');
         }
         
         function clearCart() {
             currentCart = [];
-            updateCart();
-            saveData();
+            syncData();
             showNotification('🧾 Чек очищен');
         }
         
@@ -260,6 +338,76 @@
             document.getElementById('productModal').style.display = 'none';
             document.getElementById('productName').value = '';
             document.getElementById('productPrice').value = '';
+        }
+        
+        // ============ ФУНКЦИИ СКАНЕРА ============
+        function sendBarcode(barcode) {
+            handleScan(barcode);
+            document.getElementById('lastScan').innerHTML = `Последний скан: ${barcode}`;
+            showNotification(`📦 Отправлено: ${barcode}`);
+            
+            // Переключаемся на вкладку кассира чтобы видеть результат
+            setTimeout(() => {
+                switchTab('cashier');
+            }, 1000);
+        }
+        
+        function sendManualScan() {
+            const barcode = document.getElementById('manualBarcode').value.trim();
+            if (barcode) {
+                sendBarcode(barcode);
+                document.getElementById('manualBarcode').value = '';
+            } else {
+                alert('Введите штрихкод');
+            }
+        }
+        
+        async function openCamera() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = 'environment';
+            
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                showNotification('🔄 Распознаю штрихкод...');
+                
+                try {
+                    const img = await createImageBitmap(file);
+                    const codeReader = new ZXing.BrowserMultiFormatReader();
+                    const result = await codeReader.decodeFromImageElement(img);
+                    
+                    if (result && result.text) {
+                        sendBarcode(result.text);
+                    } else {
+                        showNotification('❌ Не удалось распознать');
+                    }
+                } catch (error) {
+                    showNotification('❌ Сфотографируй штрихкод четче');
+                }
+            };
+            
+            input.click();
+        }
+        
+        // ============ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ============
+        function switchTab(tab) {
+            // Обновляем кнопки
+            document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Обновляем содержимое
+            document.getElementById('cashierTab').classList.remove('active');
+            document.getElementById('scannerTab').classList.remove('active');
+            
+            if (tab === 'cashier') {
+                document.getElementById('cashierTab').classList.add('active');
+                updateCashierDisplay();
+            } else {
+                document.getElementById('scannerTab').classList.add('active');
+            }
         }
         
         function showNotification(msg) {
@@ -270,10 +418,14 @@
             setTimeout(() => notif.remove(), 3000);
         }
         
-        updateCart();
-        updateProductsList();
+        // Инициализация
+        updateCashierDisplay();
+        
+        // Обновляем статус подключения (всегда онлайн для одного устройства)
+        document.getElementById('connectionStatus').innerHTML = '🟢 Готов к работе';
+        document.getElementById('connectionStatus').className = 'status connected';
+        document.getElementById('scannerStatus').innerHTML = '🟢 Сканер готов';
+        document.getElementById('scannerStatus').className = 'status connected';
     </script>
-    
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 </body>
 </html>
