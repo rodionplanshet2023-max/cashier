@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Касса - GitHub Pages</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #333; margin-bottom: 20px; }
+        h2 { color: #555; margin: 20px 0 15px 0; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .qr-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #5a67d8; transform: translateY(-2px); }
+        .cart-item, .product-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .clear-btn { background: #dc3545; }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .connection-status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏪 Касса</h1>
+        
+        <div id="connectionStatus" class="connection-status disconnected">
+            🔴 Ожидание подключения сканера...
+        </div>
+        
+        <div class="qr-section">
+            <h3>📱 Подключение сканера</h3>
+            <button onclick="showQR()">Показать QR код для телефона</button>
+            <div id="qrContainer" style="display:none; margin-top:20px;">
+                <img id="qrImage" src="" alt="QR Code">
+                <p>Отсканируйте QR код телефоном</p>
+                <p><small>Телефон должен быть в той же WiFi сети</small></p>
+            </div>
+        </div>
+        
+        <div class="cart-section">
+            <h2>🛒 Текущий чек</h2>
+            <div id="cartItems"></div>
+            <div id="cartTotal"></div>
+            <button onclick="clearCart()" class="clear-btn">Очистить чек</button>
+        </div>
+        
+        <div class="products-section">
+            <h2>📦 База товаров</h2>
+            <div id="productsList"></div>
+        </div>
+    </div>
+    
+    <div id="productModal" class="modal" style="display:none">
+        <div class="modal-content">
+            <h3>Новый товар</h3>
+            <p>Штрихкод: <span id="newBarcode"></span></p>
+            <input type="text" id="productName" placeholder="Название товара">
+            <input type="number" id="productPrice" placeholder="Цена">
+            <button onclick="addNewProduct()">Добавить товар</button>
+            <button onclick="closeModal()">Отмена</button>
+        </div>
+    </div>
+    
+    <script>
+        // Хранилище (в localStorage)
+        let productDB = JSON.parse(localStorage.getItem('productDB')) || {
+            "4601234567890": { name: "Молоко", price: 79.90, barcode: "4601234567890" },
+            "6901234567892": { name: "Хлеб", price: 45.00, barcode: "6901234567892" },
+            "4812345678901": { name: "Яблоки", price: 120.00, barcode: "4812345678901" }
+        };
+        
+        let currentCart = JSON.parse(localStorage.getItem('currentCart')) || [];
+        let peerConnection = null;
+        let dataChannel = null;
+        
+        function saveData() {
+            localStorage.setItem('productDB', JSON.stringify(productDB));
+            localStorage.setItem('currentCart', JSON.stringify(currentCart));
+        }
+        
+        async function showQR() {
+            // Создаем Peer ID для подключения
+            const peerId = 'cashier_' + Math.random().toString(36).substr(2, 9);
+            
+            // Инициализируем PeerJS
+            const peer = new Peer(peerId);
+            
+            peer.on('connection', (conn) => {
+                dataChannel = conn;
+                document.getElementById('connectionStatus').innerHTML = '🟢 Сканер подключен!';
+                document.getElementById('connectionStatus').className = 'connection-status connected';
+                
+                conn.on('data', (data) => {
+                    const message = JSON.parse(data);
+                    handleScan(message.barcode);
+                });
+                
+                conn.on('close', () => {
+                    document.getElementById('connectionStatus').innerHTML = '🔴 Сканер отключен';
+                    document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                });
+            });
+            
+            // Генерируем QR код со ссылкой на сканер
+            const scannerUrl = `${window.location.origin}/scanner.html?peerId=${peerId}`;
+            const QRCodeLib = await import('https://cdn.skypack.dev/qrcode');
+            const qr = await QRCodeLib.toDataURL(scannerUrl);
+            
+            document.getElementById('qrImage').src = qr;
+            document.getElementById('qrContainer').style.display = 'block';
+        }
+        
+        function handleScan(barcode) {
+            let product = productDB[barcode];
+            
+            if (product) {
+                currentCart.push(product);
+                updateCart();
+                showNotification(`✅ ${product.name} - ${product.price} руб.`);
+                saveData();
+            } else {
+                pendingBarcode = barcode;
+                document.getElementById('newBarcode').textContent = barcode;
+                document.getElementById('productModal').style.display = 'block';
+            }
+        }
+        
+        function addNewProduct() {
+            const name = document.getElementById('productName').value;
+            const price = parseFloat(document.getElementById('productPrice').value);
+            const barcode = document.getElementById('newBarcode').textContent;
+            
+            if (name && price) {
+                productDB[barcode] = { name, price, barcode };
+                currentCart.push(productDB[barcode]);
+                updateCart();
+                updateProductsList();
+                closeModal();
+                showNotification(`✅ Добавлен товар: ${name}`);
+                saveData();
+            }
+        }
+        
+        function updateCart() {
+            const container = document.getElementById('cartItems');
+            let total = 0;
+            
+            if (currentCart.length === 0) {
+                container.innerHTML = '<p>Корзина пуста</p>';
+                document.getElementById('cartTotal').innerHTML = '';
+                return;
+            }
+            
+            container.innerHTML = currentCart.map(item => {
+                total += item.price;
+                return `<div class="cart-item"><span>${item.name}</span><span>${item.price} руб.</span></div>`;
+            }).join('');
+            
+            document.getElementById('cartTotal').innerHTML = `<h3>Итого: ${total.toFixed(2)} руб.</h3>`;
+        }
+        
+        function updateProductsList() {
+            const container = document.getElementById('productsList');
+            container.innerHTML = Object.values(productDB).map(p => `
+                <div class="product-item">
+                    <span>${p.name}</span>
+                    <span>${p.price} руб.</span>
+                    <span class="barcode">${p.barcode}</span>
+                </div>
+            `).join('');
+        }
+        
+        function clearCart() {
+            currentCart = [];
+            updateCart();
+            saveData();
+            showNotification('🧾 Чек очищен');
+        }
+        
+        function closeModal() {
+            document.getElementById('productModal').style.display = 'none';
+            document.getElementById('productName').value = '';
+            document.getElementById('productPrice').value = '';
+        }
+        
+        function showNotification(msg) {
+            const notif = document.createElement('div');
+            notif.className = 'notification';
+            notif.textContent = msg;
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 3000);
+        }
+        
+        updateCart();
+        updateProductsList();
+    </script>
+    
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+</body>
+</html>
