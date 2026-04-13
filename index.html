@@ -46,8 +46,8 @@
         .admin-panel { background: #fff3cd; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: none; }
         .admin-panel h4 { color: #856404; margin-bottom: 10px; }
         .admin-panel .info { font-size: 12px; color: #856404; }
-        .delete-hint { font-size: 11px; color: #ff9800; margin-top: 5px; display: none; }
-        .delete-hint.show { display: block; }
+        .admin-hint { background: #e8f0fe; padding: 10px; border-radius: 8px; margin-top: 15px; text-align: center; font-size: 13px; }
+        .admin-code { font-family: monospace; font-size: 18px; font-weight: bold; color: #1a73e8; background: white; padding: 5px 10px; border-radius: 6px; display: inline-block; margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -70,6 +70,12 @@
             <button class="copy-btn" onclick="copyData()">📋 Копировать</button>
         </div>
         <div id="connectionStatus" class="status offline">🟡 Ожидание сканера...</div>
+        
+        <div class="admin-hint">
+            🔐 <strong>Админ код:</strong> 
+            <div class="admin-code">admin</div>
+            <small>Отсканируйте этот код для включения/выключения админ режима</small>
+        </div>
     </div>
 
     <div class="card">
@@ -78,7 +84,6 @@
             <input type="text" id="manualBarcode" placeholder="Введите штрихкод">
             <button onclick="sendManual()">Добавить</button>
         </div>
-        <div id="adminHint" class="delete-hint">🔐 Для удаления товаров сканируйте код: <strong>admin</strong></div>
     </div>
 
     <div class="card">
@@ -119,7 +124,7 @@
     const db = firebase.database();
     const auth = firebase.auth();
     
-    // Админ код (только для переключения режима)
+    // Админ код (только для переключения режима, НЕ добавляется в корзину)
     const ADMIN_CODE = "admin";
     
     let productDB = JSON.parse(localStorage.getItem('productDB')) || {
@@ -146,7 +151,6 @@
         const cartCount = document.getElementById('cartCount');
         const actions = document.getElementById('cartActions');
         const exitAdminBtn = document.getElementById('exitAdminBtn');
-        const adminHint = document.getElementById('adminHint');
         
         cartCount.innerText = currentCart.length;
         
@@ -162,7 +166,7 @@
         cartList.innerHTML = currentCart.map((item, i) => {
             total += item.price;
             const deleteDisabled = !isAdminMode ? 'disabled' : '';
-            const deleteTitle = !isAdminMode ? 'Админ режим выключен. Сканируйте admin' : 'Удалить товар';
+            const deleteTitle = !isAdminMode ? 'Админ режим выключен. Отсканируйте admin' : 'Удалить товар';
             return `
                 <div class="cart-item">
                     <div class="cart-item-info">
@@ -179,11 +183,10 @@
         totalDiv.innerHTML = `Итого: ${total.toFixed(2)} руб.`;
         cartList.appendChild(totalDiv);
         
-        // Показываем подсказку если админ режим выключен
-        if (!isAdminMode && currentCart.length > 0) {
-            adminHint.classList.add('show');
+        if (isAdminMode) {
+            exitAdminBtn.style.display = 'block';
         } else {
-            adminHint.classList.remove('show');
+            exitAdminBtn.style.display = 'none';
         }
     }
     
@@ -228,11 +231,9 @@
         isAdminMode = true;
         const badge = document.getElementById('adminBadge');
         const adminPanel = document.getElementById('adminPanel');
-        const exitAdminBtn = document.getElementById('exitAdminBtn');
         badge.innerHTML = '👑 Админ режим ВКЛЮЧЕН';
         badge.classList.add('active');
         adminPanel.style.display = 'block';
-        exitAdminBtn.style.display = 'block';
         renderCart();
         showNotification('🔓 Админ режим активирован! Теперь можно удалять товары', 'admin');
         speak("Админ режим активирован");
@@ -242,11 +243,9 @@
         isAdminMode = false;
         const badge = document.getElementById('adminBadge');
         const adminPanel = document.getElementById('adminPanel');
-        const exitAdminBtn = document.getElementById('exitAdminBtn');
         badge.innerHTML = '👑 Админ режим';
         badge.classList.remove('active');
         adminPanel.style.display = 'none';
-        exitAdminBtn.style.display = 'none';
         renderCart();
         showNotification('🔒 Админ режим выключен', 'admin');
         speak("Админ режим выключен");
@@ -255,14 +254,14 @@
     function handleScan(barcode) {
         console.log('Сканировано:', barcode);
         
-        // Проверка на админ код (переключение режима)
+        // Проверка на админ код - НЕ ДОБАВЛЯЕМ В КОРЗИНУ, только переключаем режим
         if (barcode === ADMIN_CODE) {
             if (!isAdminMode) {
                 enableAdminMode();
             } else {
                 exitAdminMode();
             }
-            return;
+            return; // Выходим, не добавляем в корзину
         }
         
         // Обычное добавление товара
