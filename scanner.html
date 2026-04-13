@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Мобильный Сканер</title>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .login-wrap {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100vh;
+            box-sizing: border-box;
+            max-width: 400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        h2 { text-align: center; margin-bottom: 30px; color: white; font-weight: 300; }
+        input {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #ddd;
+            color: #333;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-size: 18px;
+            outline: none;
+            text-align: center;
+        }
+        input:focus { border-color: #005bff; }
+        .btn-connect {
+            background: #28a745;
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .scanner-wrap {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+        #reader {
+            width: 100%;
+            flex: 1;
+            min-height: 400px;
+            background: black;
+        }
+        #reader video {
+            width: 100%;
+            height: auto;
+        }
+        .status-bar {
+            padding: 20px;
+            background: rgba(0,0,0,0.8);
+            text-align: center;
+            border-top: 1px solid #333;
+        }
+        .status-text {
+            font-weight: bold;
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .error-msg {
+            color: #ff5252;
+            text-align: center;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen" class="login-wrap">
+    <h2>📱 Подключение к терминалу</h2>
+    <input type="tel" id="input-id" placeholder="Код с экрана ПК (6 цифр)" maxlength="6">
+    <input type="text" id="input-pass" placeholder="Пароль">
+    <button class="btn-connect" onclick="attemptConnection()">🔗 Подключиться</button>
+    <div id="error-msg" class="error-msg"></div>
+</div>
+
+<div id="scanner-screen" class="scanner-wrap">
+    <div id="reader"></div>
+    <div class="status-bar">
+        <div id="scan-status" class="status-text">📷 Готов к сканированию</div>
+        <button class="btn-stop" onclick="location.reload()">🔌 Отключиться</button>
+    </div>
+</div>
+
+<script>
+    // Firebase конфиг
+    const firebaseConfig = {
+        apiKey: "AIzaSyDAwSnBo0_omIX8iYyogAF3sOSbAd-36f4",
+        authDomain: "kassa-41e44.firebaseapp.com",
+        databaseURL: "https://kassa-41e44-default-rtdb.firebaseio.com",
+        projectId: "kassa-41e44",
+        storageBucket: "kassa-41e44.firebasestorage.app",
+        messagingSenderId: "743733243080",
+        appId: "1:743733243080:web:b7fe8609e4e8c61b8809fd"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+    
+    let activeSessionId = null;
+    let html5QrcodeScanner = null;
+    let isScanning = false;
+    
+    auth.signInAnonymously().catch(e => console.error("Auth Error:", e));
+    
+    function attemptConnection() {
+        const id = document.getElementById('input-id').value;
+        const pass = document.getElementById('input-pass').value.trim();
+        const errorMsg = document.getElementById('error-msg');
+        
+        if(id.length < 6 || !pass) {
+            errorMsg.innerText = "Заполните все поля";
+            return;
+        }
+        
+        errorMsg.innerText = "Проверка подключения...";
+        
+        db.ref('sessions/' + id).once('value').then((snapshot) => {
+            const data = snapshot.val();
+            if(data && data.password === pass.toUpperCase()) {
+                activeSessionId = id;
+                startScanner();
+            } else {
+                errorMsg.innerText = "❌ Неверный код или пароль";
+            }
+        }).catch(err => {
+            console.error(err);
+            errorMsg.innerText = "Ошибка подключения к серверу";
+        });
+    }
+    
+    function startScanner() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('scanner-screen').style.display = 'flex';
+        
+        html5QrcodeScanner = new Html5Qrcode("reader");
+        
+        html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 200 } },
+            (decodedText) => {
+                if(!activeSessionId) return;
+                
+                if(navigator.vibrate) navigator.vibrate(200);
+                
+                const statusEl = document.getElementById('scan-status');
+                statusEl.innerHTML = "📤 Отправка: " + decodedText;
+                statusEl.style.color = "#ffc107";
+                
+                db.ref('sessions/' + activeSessionId).update({
+                    scannedCode: decodedText
+                }).then(() => {
+                    statusEl.innerHTML = "✅ Отправлено!";
+                    statusEl.style.color = "#4caf50";
+                    setTimeout(() => {
+                        statusEl.innerHTML = "📷 Готов к сканированию";
+                    }, 1500);
+                }).catch(() => {
+                    statusEl.innerHTML = "❌ Ошибка отправки";
+                    statusEl.style.color = "#f44336";
+                    setTimeout(() => {
+                        statusEl.innerHTML = "📷 Готов к сканированию";
+                        statusEl.style.color = "#4caf50";
+                    }, 2000);
+                });
+            },
+            (errorMessage) => {}
+        ).catch(err => {
+            console.error("Camera error:", err);
+            alert("Ошибка камеры: " + err);
+        });
+        
+        isScanning = true;
+    }
+</script>
+</body>
+</html>
