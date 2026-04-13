@@ -494,119 +494,266 @@
         });
     }
     
-    // РЕЖИМ ТЕЛЕФОНА (сам телефон) - ТА ЖЕ КАМЕРА ЧТО И НА ПК
-    function initPhoneMode() {
+    // РЕЖИМ ТЕЛЕФОНА - проверяем сразу при загрузке
+    (function initPhoneMode() {
         const urlParams = new URLSearchParams(window.location.search);
         const isPhone = urlParams.get('phone');
         const session = urlParams.get('session');
         
         if (isPhone === '1' && session) {
-            document.body.innerHTML = `
-                <div style="max-width: 600px; margin: 20px auto; padding: 20px;">
-                    <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-                        <h2 style="text-align: center; margin-bottom: 20px;">📱 Сканер</h2>
-                        <div style="background: #e8f0fe; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
-                            <p>Подключен к терминалу</p>
-                            <div style="font-size: 32px; font-weight: bold; color: #1a73e8;">${session}</div>
-                        </div>
-                        
-                        <div id="phoneReader" style="width: 100%; min-height: 300px;"></div>
-                        
-                        <button id="phoneCameraBtn" style="width:100%; padding: 18px; margin-top: 15px; background: #28a745; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer;">
-                            📸 Включить камеру
-                        </button>
-                        
-                        <div style="margin-top: 20px;">
-                            <input type="text" id="manualInput" placeholder="Или введите штрихкод вручную" style="width:100%; padding: 15px; font-size: 16px; border: 2px solid #ddd; border-radius: 10px;">
-                            <button onclick="sendManualPhone()" style="width:100%; margin-top: 10px; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Отправить</button>
-                        </div>
-                        
-                        <div id="result" style="margin-top: 20px; padding: 15px; border-radius: 10px; text-align: center; display: none;"></div>
-                    </div>
-                </div>
-                <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>
-                <script>
-                    let phoneScanner = null;
-                    let isPhoneScanning = false;
-                    const sessionId = '${session}';
-                    let channel = null;
-                    
-                    try {
-                        channel = new BroadcastChannel('pzv_' + sessionId);
-                    } catch(e) { console.error(e); }
-                    
-                    function sendToTerminal(barcode) {
-                        if (channel) {
-                            channel.postMessage({ type: 'scan', barcode: barcode });
-                            const resultDiv = document.getElementById('result');
-                            resultDiv.style.display = 'block';
-                            resultDiv.style.background = '#d4edda';
-                            resultDiv.style.color = '#155724';
-                            resultDiv.innerHTML = '✅ Отправлено: ' + barcode;
-                            setTimeout(() => {
-                                resultDiv.style.display = 'none';
-                            }, 2000);
-                            if (navigator.vibrate) navigator.vibrate(100);
-                        } else {
-                            alert('Нет соединения с терминалом');
-                        }
+            // Полностью пересоздаем страницу для телефона
+            document.documentElement.innerHTML = `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Сканер - Телефон</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            background: #e8f0fe;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .status .code {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a73e8;
+            font-family: monospace;
+            margin-top: 5px;
+        }
+        #phoneReader {
+            width: 100%;
+            min-height: 300px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+        }
+        #phoneReader video {
+            width: 100%;
+            height: auto;
+        }
+        .btn-camera {
+            width: 100%;
+            padding: 18px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-camera.stop {
+            background: #dc3545;
+        }
+        .manual-input {
+            margin-top: 20px;
+        }
+        .manual-input input {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+        }
+        .manual-input button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        .info {
+            margin-top: 15px;
+            padding: 12px;
+            background: #fff3cd;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #856404;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Сканер</h1>
+        
+        <div class="status">
+            <div>Подключен к терминалу</div>
+            <div class="code">${session}</div>
+        </div>
+        
+        <div id="phoneReader"></div>
+        
+        <button id="cameraToggleBtn" class="btn-camera">
+            📸 Включить камеру
+        </button>
+        
+        <div class="manual-input">
+            <input type="text" id="manualBarcode" placeholder="Или введите штрихкод вручную">
+            <button id="manualSendBtn">Отправить</button>
+        </div>
+        
+        <div id="result" class="result"></div>
+        
+        <div class="info">
+            💡 Нажми "Включить камеру", наведи на штрихкод<br>
+            Сканирование происходит автоматически!
+        </div>
+    </div>
+
+    <script>
+        let scanner = null;
+        let isRunning = false;
+        const sessionId = '${session}';
+        let channel = null;
+        
+        // Создаем канал связи
+        try {
+            channel = new BroadcastChannel('pzv_' + sessionId);
+            console.log('Канал создан');
+        } catch(e) {
+            console.error('Ошибка канала:', e);
+        }
+        
+        function sendToTerminal(barcode) {
+            if (channel) {
+                channel.postMessage({ type: 'scan', barcode: barcode });
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = '#d4edda';
+                resultDiv.style.color = '#155724';
+                resultDiv.innerHTML = '✅ Отправлено: ' + barcode;
+                setTimeout(() => {
+                    resultDiv.style.display = 'none';
+                }, 2000);
+                if (navigator.vibrate) navigator.vibrate(100);
+                console.log('Отправлено:', barcode);
+            } else {
+                alert('Нет соединения с терминалом');
+            }
+        }
+        
+        async function toggleCamera() {
+            const btn = document.getElementById('cameraToggleBtn');
+            
+            if (isRunning) {
+                // Останавливаем
+                if (scanner) {
+                    await scanner.stop();
+                    scanner.clear();
+                }
+                isRunning = false;
+                btn.innerHTML = '📸 Включить камеру';
+                btn.classList.remove('stop');
+                console.log('Камера остановлена');
+                return;
+            }
+            
+            // Запускаем
+            btn.innerHTML = '🔴 Остановить камеру';
+            btn.classList.add('stop');
+            
+            scanner = new Html5Qrcode("phoneReader");
+            
+            try {
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 200 },
+                        aspectRatio: 1.0
+                    },
+                    (decodedText) => {
+                        console.log('Распознано:', decodedText);
+                        sendToTerminal(decodedText);
+                        if (navigator.vibrate) navigator.vibrate(100);
+                    },
+                    (errorMessage) => {
+                        // Игнорируем ошибки сканирования
+                        // console.log(errorMessage);
                     }
-                    
-                    async function startPhoneCamera() {
-                        const btn = document.getElementById('phoneCameraBtn');
-                        
-                        if (isPhoneScanning) {
-                            if (phoneScanner) {
-                                await phoneScanner.stop();
-                                phoneScanner.clear();
-                            }
-                            isPhoneScanning = false;
-                            btn.innerHTML = '📸 Включить камеру';
-                            btn.style.background = '#28a745';
-                            return;
-                        }
-                        
-                        btn.innerHTML = '🔴 Остановить камеру';
-                        btn.style.background = '#dc3545';
-                        phoneScanner = new Html5Qrcode("phoneReader");
-                        
-                        try {
-                            await phoneScanner.start(
-                                { facingMode: "environment" },
-                                { fps: 10, qrbox: { width: 250, height: 200 } },
-                                (text) => { 
-                                    sendToTerminal(text);
-                                    if (navigator.vibrate) navigator.vibrate(100);
-                                },
-                                (err) => {}
-                            );
-                            isPhoneScanning = true;
-                        } catch(err) {
-                            alert('❌ Ошибка камеры: ' + err);
-                            btn.innerHTML = '📸 Включить камеру';
-                            btn.style.background = '#28a745';
-                            isPhoneScanning = false;
-                        }
-                    }
-                    
-                    function sendManualPhone() {
-                        const barcode = document.getElementById('manualInput').value.trim();
-                        if (barcode) {
-                            sendToTerminal(barcode);
-                            document.getElementById('manualInput').value = '';
-                        } else {
-                            alert('Введите штрихкод');
-                        }
-                    }
-                    
-                    document.getElementById('phoneCameraBtn').onclick = startPhoneCamera;
-                    window.sendManualPhone = sendManualPhone;
-                <\/script>
+                );
+                isRunning = true;
+                console.log('Камера запущена');
+            } catch (err) {
+                console.error('Ошибка:', err);
+                alert('❌ Ошибка камеры: ' + err.message);
+                btn.innerHTML = '📸 Включить камеру';
+                btn.classList.remove('stop');
+                isRunning = false;
+            }
+        }
+        
+        function sendManual() {
+            const barcode = document.getElementById('manualBarcode').value.trim();
+            if (barcode) {
+                sendToTerminal(barcode);
+                document.getElementById('manualBarcode').value = '';
+            } else {
+                alert('Введите штрихкод');
+            }
+        }
+        
+        // Привязываем обработчики после загрузки DOM
+        document.addEventListener('DOMContentLoaded', function() {
+            const cameraBtn = document.getElementById('cameraToggleBtn');
+            const manualBtn = document.getElementById('manualSendBtn');
+            
+            if (cameraBtn) {
+                cameraBtn.onclick = toggleCamera;
+                console.log('Кнопка камеры активирована');
+            }
+            if (manualBtn) {
+                manualBtn.onclick = sendManual;
+                console.log('Кнопка ручного ввода активирована');
+            }
+        });
+        
+        console.log('Страница сканера загружена, сессия: ' + sessionId);
+    <\/script>
+</body>
+</html>
             `;
             return true;
         }
         return false;
-    }
+    })();
     
     function speak(text) {
         if ('speechSynthesis' in window) {
@@ -634,8 +781,8 @@
     style.textContent = `@keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }`;
     document.head.appendChild(style);
     
-    // ИНИЦИАЛИЗАЦИЯ
-    const isPhoneMode = initPhoneMode();
+    // ИНИЦИАЛИЗАЦИЯ (только если не в режиме телефона)
+    const isPhoneMode = window.location.search.includes('phone=1');
     
     if (!isPhoneMode) {
         document.getElementById('cameraBtn').onclick = toggleCamera;
@@ -644,18 +791,20 @@
         const localMode = document.getElementById('localMode');
         const remoteMode = document.getElementById('remoteMode');
         
-        modeToggle.addEventListener('change', function() {
-            if (this.checked) {
-                if (isScannerRunning) toggleCamera();
-                localMode.style.display = 'none';
-                remoteMode.style.display = 'block';
-                createRemoteSession();
-            } else {
-                remoteMode.style.display = 'none';
-                localMode.style.display = 'block';
-                destroyRemoteSession();
-            }
-        });
+        if (modeToggle) {
+            modeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    if (isScannerRunning) toggleCamera();
+                    localMode.style.display = 'none';
+                    remoteMode.style.display = 'block';
+                    createRemoteSession();
+                } else {
+                    remoteMode.style.display = 'none';
+                    localMode.style.display = 'block';
+                    destroyRemoteSession();
+                }
+            });
+        }
         
         renderCart();
     }
