@@ -2,303 +2,81 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ПВЗ Терминал</title>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .header { background: white; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-        .logo-text { font-size: 24px; font-weight: 800; background: linear-gradient(90deg, #005bff, #cb11ab); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .mode-switch { display: flex; align-items: center; gap: 12px; }
-        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #cb11ab; }
-        input:checked + .slider:before { transform: translateX(22px); }
-        .container { display: flex; gap: 20px; flex-wrap: wrap; }
-        .card { flex: 1; min-width: 300px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .btn-camera { background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none; padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 15px; }
-        .btn-camera.stop { background: #dc3545; }
-        .manual-input input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-top: 15px; }
-        .manual-input button { width: 100%; margin-top: 10px; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; }
-        .cart-list { max-height: 400px; overflow-y: auto; margin-top: 15px; }
-        .cart-item { display: flex; align-items: center; gap: 12px; background: #f8f9fa; padding: 12px; margin-bottom: 10px; border-radius: 8px; }
-        .cart-item-info { flex: 1; }
-        .cart-item-name { font-weight: 600; }
-        .cart-item-code { font-size: 11px; color: #888; margin-top: 4px; }
-        .btn-remove { background: #ff4444; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; }
-        .actions { display: flex; gap: 15px; margin-top: 20px; }
-        .btn-pay { background: linear-gradient(90deg, #4caf50, #43a047); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .remote-info { background: #e8f0fe; padding: 20px; border-radius: 8px; text-align: center; }
-        .code-display { font-size: 48px; font-weight: bold; color: #1a73e8; margin: 15px 0; font-family: monospace; background: white; padding: 15px; border-radius: 10px; }
-        .remote-url { background: white; padding: 12px; border-radius: 8px; word-break: break-all; font-family: monospace; font-size: 12px; margin: 10px 0; }
-        .copy-btn { background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
-        .status { padding: 10px; margin-top: 15px; border-radius: 8px; text-align: center; font-size: 14px; }
-        .status.waiting { background: #fff3cd; color: #856404; }
-        .status.online { background: #d4edda; color: #155724; }
-        #reader, #phoneReader { width: 100%; min-height: 300px; background: #000; border-radius: 8px; overflow: hidden; }
-        #reader video, #phoneReader video { width: 100%; }
-        .notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; animation: fadeOut 2s ease; z-index: 9999; }
-        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
-        @media (max-width: 768px) { body { padding: 10px; } .card { padding: 15px; } .code-display { font-size: 32px; } }
-    </style>
-</head>
-<body>
-
-<div class="header">
-    <div class="logo-text">🏪 ПВЗ Терминал</div>
-    <div class="mode-switch">
-        <span>📷 Камера ПК</span>
-        <label class="switch"><input type="checkbox" id="modeToggle"><span class="slider"></span></label>
-        <span>📱 Телефон</span>
-    </div>
-</div>
-
-<div class="container">
-    <div class="card">
-        <div id="localMode">
-            <h3>📷 Сканирование</h3>
-            <div id="reader"></div>
-            <button class="btn-camera" id="cameraBtn">📸 Включить камеру</button>
-            <div class="manual-input">
-                <input type="text" id="manualBarcode" placeholder="Введите штрихкод вручную">
-                <button onclick="sendManual()">Отправить</button>
-            </div>
-        </div>
-        <div id="remoteMode" style="display:none;">
-            <h3>📱 Подключение телефона</h3>
-            <div class="remote-info">
-                <div>🔑 Код терминала</div>
-                <div class="code-display" id="sessionCode">---</div>
-                <div>🌐 Ссылка для телефона</div>
-                <div class="remote-url" id="remoteUrl">---</div>
-                <button class="copy-btn" onclick="copyUrl()">📋 Копировать ссылку</button>
-            </div>
-            <div id="remoteStatus" class="status waiting">🟡 Ожидание сканирования...</div>
-        </div>
-    </div>
-    <div class="card">
-        <div style="display: flex; justify-content: space-between;"><h3>🛒 Корзина</h3><span id="cartCount" style="background:#005bff; color:white; padding:2px 10px; border-radius:12px;">0</span></div>
-        <div id="cartList" class="cart-list"><p style="color:#999; text-align:center;">Сканируйте товары</p></div>
-        <div class="actions" id="cartActions" style="display:none;">
-            <button class="btn-return" onclick="clearCart()">❌ Очистить</button>
-            <button class="btn-pay" onclick="checkout()">✅ Оплатить</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // ============ ДАННЫЕ ============
-    let productDB = JSON.parse(localStorage.getItem('productDB')) || {
-        "4601234567890": { name: "Молоко", price: 79.90 },
-        "6901234567892": { name: "Хлеб", price: 45.00 },
-        "4812345678901": { name: "Яблоки", price: 120.00 }
-    };
-    let currentCart = JSON.parse(localStorage.getItem('currentCart')) || [];
-    let scanner = null;
-    let isScanning = false;
-    let currentSession = null;
-    let channel = null;
-    
-    function save() {
-        localStorage.setItem('productDB', JSON.stringify(productDB));
-        localStorage.setItem('currentCart', JSON.stringify(currentCart));
-        renderCart();
-    }
-    
-    function renderCart() {
-        const cartList = document.getElementById('cartList');
-        const cartCount = document.getElementById('cartCount');
-        const actions = document.getElementById('cartActions');
-        cartCount.innerText = currentCart.length;
-        if (currentCart.length === 0) {
-            cartList.innerHTML = '<p style="color:#999; text-align:center;">Сканируйте товары</p>';
-            actions.style.display = 'none';
-            return;
-        }
-        actions.style.display = 'flex';
-        let total = 0;
-        cartList.innerHTML = currentCart.map((item, i) => {
-            total += item.price;
-            return `<div class="cart-item"><div class="cart-item-info"><div class="cart-item-name">${escapeHtml(item.name)}</div><div class="cart-item-code">${item.code} • ${item.price} руб.</div></div><button class="btn-remove" onclick="removeItem(${i})">✕</button></div>`;
-        }).join('');
-        const totalDiv = document.createElement('div');
-        totalDiv.style.cssText = 'margin-top:15px; padding-top:15px; border-top:2px solid #ddd; text-align:right; font-weight:bold;';
-        totalDiv.innerHTML = `Итого: ${total.toFixed(2)} руб.`;
-        cartList.appendChild(totalDiv);
-    }
-    
-    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
-    function removeItem(i) { currentCart.splice(i,1); save(); speak("Товар удален"); }
-    function clearCart() { if(currentCart.length===0)return; currentCart = []; save(); speak("Корзина очищена"); }
-    function checkout() { if(currentCart.length===0)return; let total = currentCart.reduce((s,i)=>s+i.price,0); speak(`Оплачено ${total.toFixed(2)} рублей`); currentCart = []; save(); }
-    
-    function handleScan(barcode) {
-        let product = productDB[barcode];
-        if(product) {
-            currentCart.push({ code: barcode, name: product.name, price: product.price });
-            save();
-            speak(`Добавлен ${product.name}`);
-            showNotif(`✅ ${product.name} - ${product.price} руб.`);
-        } else {
-            let name = prompt(`📦 Новый товар!\nШтрихкод: ${barcode}\n\nВведите название:`);
-            if(name && name.trim()) {
-                let price = parseFloat(prompt(`💰 Цена для "${name}":`));
-                if(price > 0) {
-                    productDB[barcode] = { name: name.trim(), price: price };
-                    currentCart.push({ code: barcode, name: name.trim(), price: price });
-                    save();
-                    speak(`Добавлен ${name}`);
-                    showNotif(`✅ Новый: ${name} - ${price} руб.`);
-                }
-            }
-        }
-    }
-    
-    async function toggleCamera() {
-        const btn = document.getElementById('cameraBtn');
-        if(isScanning) {
-            if(scanner) { await scanner.stop(); scanner.clear(); }
-            isScanning = false;
-            btn.innerHTML = '📸 Включить камеру';
-            btn.classList.remove('stop');
-        } else {
-            btn.innerHTML = '🔴 Остановить камеру';
-            btn.classList.add('stop');
-            scanner = new Html5Qrcode("reader");
-            try {
-                await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => handleScan(text), (err) => {});
-                isScanning = true;
-            } catch(e) { alert('Ошибка камеры: ' + e); btn.innerHTML = '📸 Включить камеру'; btn.classList.remove('stop'); }
-        }
-    }
-    
-    function sendManual() { let b = document.getElementById('manualBarcode').value.trim(); if(b) { handleScan(b); document.getElementById('manualBarcode').value = ''; } }
-    
-    function createSession() {
-        currentSession = Math.floor(100000 + Math.random() * 900000);
-        document.getElementById('sessionCode').innerText = currentSession;
-        let url = `${window.location.origin}${window.location.pathname}?phone=1&session=${currentSession}`;
-        document.getElementById('remoteUrl').innerHTML = url;
-        if(channel) channel.close();
-        channel = new BroadcastChannel('pzv_' + currentSession);
-        channel.onmessage = (e) => {
-            if(e.data.type === 'scan') {
-                handleScan(e.data.barcode);
-                let st = document.getElementById('remoteStatus');
-                st.innerHTML = '🟢 Сканирование получено!';
-                st.className = 'status online';
-                setTimeout(() => { st.innerHTML = '🟡 Ожидание сканирования...'; st.className = 'status waiting'; }, 2000);
-            }
-        };
-    }
-    
-    function copyUrl() { let url = document.getElementById('remoteUrl').innerText; navigator.clipboard.writeText(url); showNotif('✅ Ссылка скопирована'); }
-    function speak(t) { if('speechSynthesis' in window) { window.speechSynthesis.cancel(); let u = new SpeechSynthesisUtterance(t); u.lang = 'ru-RU'; window.speechSynthesis.speak(u); } }
-    function showNotif(m) { let n = document.createElement('div'); n.className = 'notification'; n.textContent = m; document.body.appendChild(n); setTimeout(() => n.remove(), 2000); }
-    
-    document.getElementById('cameraBtn').onclick = toggleCamera;
-    document.getElementById('modeToggle').onchange = function(e) {
-        if(this.checked) {
-            if(isScanning) toggleCamera();
-            document.getElementById('localMode').style.display = 'none';
-            document.getElementById('remoteMode').style.display = 'block';
-            createSession();
-        } else {
-            document.getElementById('remoteMode').style.display = 'none';
-            document.getElementById('localMode').style.display = 'block';
-            if(channel) { channel.close(); channel = null; }
-        }
-    };
-    renderCart();
-</script>
-
-<!-- ============ ТЕЛЕФОННЫЙ РЕЖИМ (ОТДЕЛЬНАЯ СТРАНИЦА) ============ -->
-<script>
-    (function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const isPhone = urlParams.get('phone');
-        const sessionId = urlParams.get('session');
-        
-        if(isPhone === '1' && sessionId) {
-            // Полностью заменяем страницу на режим телефона
-            document.documentElement.innerHTML = `
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Сканер - Телефон</title>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: #f0f2f5;
             padding: 20px;
         }
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
+        .header {
             background: white;
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        h1 { text-align: center; color: #333; margin-bottom: 20px; }
-        .status {
-            background: #e8f0fe;
-            padding: 15px;
+            padding: 15px 25px;
             border-radius: 12px;
-            text-align: center;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
         }
-        .status .code {
-            font-size: 36px;
+        .logo-text {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #005bff, #cb11ab);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .session-info {
+            background: #e8f0fe;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .session-code {
+            font-size: 28px;
             font-weight: bold;
             color: #1a73e8;
             font-family: monospace;
-            margin-top: 5px;
+            letter-spacing: 3px;
         }
-        #reader {
-            width: 100%;
-            min-height: 300px;
-            background: #000;
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .card {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            padding: 25px;
             border-radius: 12px;
-            overflow: hidden;
-        }
-        #reader video {
-            width: 100%;
-            height: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         .btn-camera {
-            width: 100%;
-            padding: 18px;
-            margin-top: 15px;
-            background: #28a745;
+            background: linear-gradient(135deg, #28a745, #20c997);
             color: white;
             border: none;
-            border-radius: 12px;
-            font-size: 18px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-        }
-        .btn-camera.stop {
-            background: #dc3545;
-        }
-        .manual-input {
-            margin-top: 20px;
+            width: 100%;
+            margin-top: 15px;
         }
         .manual-input input {
             width: 100%;
-            padding: 15px;
+            padding: 12px;
             font-size: 16px;
             border: 2px solid #ddd;
-            border-radius: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
         }
         .manual-input button {
             width: 100%;
@@ -310,140 +88,279 @@
             border-radius: 8px;
             cursor: pointer;
         }
-        .result {
+        .cart-list {
+            max-height: 400px;
+            overflow-y: auto;
             margin-top: 15px;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            display: none;
         }
-        .info {
-            margin-top: 15px;
+        .cart-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8f9fa;
             padding: 12px;
-            background: #fff3cd;
+            margin-bottom: 10px;
             border-radius: 8px;
-            font-size: 12px;
-            color: #856404;
+        }
+        .cart-item-info { flex: 1; }
+        .cart-item-name { font-weight: 600; }
+        .cart-item-code { font-size: 11px; color: #888; margin-top: 4px; }
+        .btn-remove {
+            background: #ff4444;
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .btn-pay {
+            background: linear-gradient(90deg, #4caf50, #43a047);
+            color: white;
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-return {
+            background: linear-gradient(90deg, #f44336, #e53935);
+            color: white;
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .status {
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 8px;
             text-align: center;
+            font-size: 14px;
+        }
+        .status.online { background: #d4edda; color: #155724; }
+        .status.offline { background: #f8d7da; color: #721c24; }
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            animation: fadeOut 2s ease;
+            z-index: 9999;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📱 Сканер</h1>
-        
-        <div class="status">
-            <div>Подключен к терминалу</div>
-            <div class="code">${sessionId}</div>
-        </div>
-        
-        <div id="reader"></div>
-        
-        <button id="cameraBtn" class="btn-camera">
-            📸 Включить камеру
-        </button>
-        
+
+<div class="header">
+    <div class="logo-text">🏪 ПВЗ Терминал</div>
+    <div class="session-info">
+        <div>🔑 Код для сканера</div>
+        <div class="session-code" id="sessionCode">Загрузка...</div>
+        <div style="font-size: 12px;">Введите этот код в приложении на телефоне</div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <h3>📷 Ручной ввод</h3>
         <div class="manual-input">
-            <input type="text" id="manualBarcode" placeholder="Или введите штрихкод вручную">
-            <button id="manualSendBtn">Отправить</button>
-        </div>
-        
-        <div id="result" class="result"></div>
-        
-        <div class="info">
-            💡 Нажми "Включить камеру", наведи на штрихкод<br>
-            Сканирование происходит автоматически!
+            <input type="text" id="manualBarcode" placeholder="Введите штрихкод вручную">
+            <button onclick="sendManual()">Добавить товар</button>
         </div>
     </div>
 
-    <script>
-        let scanner = null;
-        let isScanning = false;
-        const sessionId = '${sessionId}';
-        let channel = null;
+    <div class="card">
+        <div style="display: flex; justify-content: space-between;">
+            <h3>🛒 Корзина</h3>
+            <span id="cartCount" style="background:#005bff; color:white; padding:2px 10px; border-radius:12px;">0</span>
+        </div>
+        <div id="cartList" class="cart-list">
+            <p style="color:#999; text-align:center;">Сканируйте товары</p>
+        </div>
+        <div class="actions" id="cartActions" style="display:none;">
+            <button class="btn-return" onclick="clearCart()">❌ Очистить</button>
+            <button class="btn-pay" onclick="checkout()">✅ Оплатить</button>
+        </div>
+        <div id="connectionStatus" class="status offline">🔴 Ожидание подключения сканера...</div>
+    </div>
+</div>
+
+<script>
+    // Firebase конфиг
+    const firebaseConfig = {
+        apiKey: "AIzaSyDAwSnBo0_omIX8iYyogAF3sOSbAd-36f4",
+        authDomain: "kassa-41e44.firebaseapp.com",
+        databaseURL: "https://kassa-41e44-default-rtdb.firebaseio.com",
+        projectId: "kassa-41e44",
+        storageBucket: "kassa-41e44.firebasestorage.app",
+        messagingSenderId: "743733243080",
+        appId: "1:743733243080:web:b7fe8609e4e8c61b8809fd"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+    
+    // Данные
+    let productDB = JSON.parse(localStorage.getItem('productDB')) || {
+        "4601234567890": { name: "Молоко", price: 79.90 },
+        "6901234567892": { name: "Хлеб", price: 45.00 },
+        "4812345678901": { name: "Яблоки", price: 120.00 }
+    };
+    let currentCart = JSON.parse(localStorage.getItem('currentCart')) || [];
+    let currentSessionId = null;
+    let sessionRef = null;
+    
+    auth.signInAnonymously().catch(console.error);
+    
+    function saveData() {
+        localStorage.setItem('productDB', JSON.stringify(productDB));
+        localStorage.setItem('currentCart', JSON.stringify(currentCart));
+        renderCart();
+    }
+    
+    function renderCart() {
+        const cartList = document.getElementById('cartList');
+        const cartCount = document.getElementById('cartCount');
+        const actions = document.getElementById('cartActions');
         
-        try {
-            channel = new BroadcastChannel('pzv_' + sessionId);
-            console.log('Канал создан, сессия:', sessionId);
-        } catch(e) { console.error(e); }
+        cartCount.innerText = currentCart.length;
         
-        function sendToTerminal(barcode) {
-            if(channel) {
-                channel.postMessage({ type: 'scan', barcode: barcode });
-                const resultDiv = document.getElementById('result');
-                resultDiv.style.display = 'block';
-                resultDiv.style.background = '#d4edda';
-                resultDiv.style.color = '#155724';
-                resultDiv.innerHTML = '✅ Отправлено: ' + barcode;
-                setTimeout(() => { resultDiv.style.display = 'none'; }, 2000);
-                if(navigator.vibrate) navigator.vibrate(100);
-                console.log('Отправлено:', barcode);
-            } else {
-                alert('Нет соединения с терминалом');
-            }
+        if (currentCart.length === 0) {
+            cartList.innerHTML = '<p style="color:#999; text-align:center;">Сканируйте товары</p>';
+            actions.style.display = 'none';
+            return;
         }
         
-        async function toggleCamera() {
-            const btn = document.getElementById('cameraBtn');
-            
-            if(isScanning) {
-                if(scanner) {
-                    await scanner.stop();
-                    scanner.clear();
-                }
-                isScanning = false;
-                btn.innerHTML = '📸 Включить камеру';
-                btn.classList.remove('stop');
-                console.log('Камера остановлена');
-                return;
-            }
-            
-            btn.innerHTML = '🔴 Остановить камеру';
-            btn.classList.add('stop');
-            
-            scanner = new Html5Qrcode("reader");
-            
-            try {
-                await scanner.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 200 } },
-                    (decodedText) => {
-                        console.log('Распознано:', decodedText);
-                        sendToTerminal(decodedText);
-                    },
-                    (errorMessage) => {}
-                );
-                isScanning = true;
-                console.log('Камера запущена');
-            } catch(err) {
-                console.error('Ошибка:', err);
-                alert('❌ Ошибка камеры: ' + err.message);
-                btn.innerHTML = '📸 Включить камеру';
-                btn.classList.remove('stop');
-                isScanning = false;
-            }
-        }
-        
-        function sendManual() {
-            const barcode = document.getElementById('manualBarcode').value.trim();
-            if(barcode) {
-                sendToTerminal(barcode);
-                document.getElementById('manualBarcode').value = '';
-            } else {
-                alert('Введите штрихкод');
-            }
-        }
-        
-        document.getElementById('cameraBtn').onclick = toggleCamera;
-        document.getElementById('manualSendBtn').onclick = sendManual;
-        
-        console.log('Страница сканера загружена');
-    <\/script>
-</body>
-</html>
+        actions.style.display = 'flex';
+        let total = 0;
+        cartList.innerHTML = currentCart.map((item, i) => {
+            total += item.price;
+            return `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <div class="cart-item-name">${escapeHtml(item.name)}</div>
+                        <div class="cart-item-code">${item.code} • ${item.price} руб.</div>
+                    </div>
+                    <button class="btn-remove" onclick="removeItem(${i})">✕</button>
+                </div>
             `;
+        }).join('');
+        
+        const totalDiv = document.createElement('div');
+        totalDiv.style.cssText = 'margin-top:15px; padding-top:15px; border-top:2px solid #ddd; text-align:right; font-weight:bold;';
+        totalDiv.innerHTML = `Итого: ${total.toFixed(2)} руб.`;
+        cartList.appendChild(totalDiv);
+    }
+    
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    function removeItem(i) { currentCart.splice(i,1); saveData(); speak("Товар удален"); }
+    function clearCart() { if(currentCart.length===0)return; currentCart = []; saveData(); speak("Корзина очищена"); }
+    
+    function checkout() {
+        if(currentCart.length===0) return;
+        let total = currentCart.reduce((s,i)=>s+i.price,0);
+        speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
+        currentCart = [];
+        saveData();
+    }
+    
+    function handleScan(barcode) {
+        let product = productDB[barcode];
+        if(product) {
+            currentCart.push({ code: barcode, name: product.name, price: product.price });
+            saveData();
+            speak(`Добавлен ${product.name}, ${product.price} рублей`);
+            showNotification(`✅ ${product.name} - ${product.price} руб.`);
+        } else {
+            let name = prompt(`📦 Новый товар!\nШтрихкод: ${barcode}\n\nВведите название:`);
+            if(name && name.trim()) {
+                let price = parseFloat(prompt(`💰 Цена для "${name}":`));
+                if(price > 0) {
+                    productDB[barcode] = { name: name.trim(), price: price };
+                    currentCart.push({ code: barcode, name: name.trim(), price: price });
+                    saveData();
+                    speak(`Добавлен новый товар: ${name}`);
+                    showNotification(`✅ Новый: ${name} - ${price} руб.`);
+                }
+            }
         }
-    })();
+    }
+    
+    function sendManual() {
+        let barcode = document.getElementById('manualBarcode').value.trim();
+        if(barcode) { handleScan(barcode); document.getElementById('manualBarcode').value = ''; }
+    }
+    
+    // Создание сессии для подключения телефона
+    function createSession() {
+        currentSessionId = Math.floor(100000 + Math.random() * 900000).toString();
+        const sessionPassword = Math.random().toString(36).slice(-8).toUpperCase();
+        
+        document.getElementById('sessionCode').innerText = currentSessionId;
+        
+        sessionRef = db.ref('sessions/' + currentSessionId);
+        sessionRef.set({ password: sessionPassword, active: true, scannedCode: "" });
+        sessionRef.onDisconnect().remove();
+        
+        // Слушаем сканирования
+        sessionRef.child('scannedCode').on('value', (snapshot) => {
+            const code = snapshot.val();
+            if(code && code !== "") {
+                handleScan(code);
+                const statusDiv = document.getElementById('connectionStatus');
+                statusDiv.innerHTML = '🟢 Сканирование получено!';
+                statusDiv.className = 'status online';
+                setTimeout(() => {
+                    statusDiv.innerHTML = '🟡 Ожидание сканирования...';
+                    statusDiv.className = 'status offline';
+                }, 2000);
+                sessionRef.update({ scannedCode: "" });
+            }
+        });
+        
+        const statusDiv = document.getElementById('connectionStatus');
+        statusDiv.innerHTML = '🟢 Сканер готов к подключению!';
+        statusDiv.className = 'status online';
+    }
+    
+    function speak(text) {
+        if('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            let u = new SpeechSynthesisUtterance(text);
+            u.lang = 'ru-RU';
+            window.speechSynthesis.speak(u);
+        }
+    }
+    
+    function showNotification(msg) {
+        let n = document.createElement('div');
+        n.className = 'notification';
+        n.textContent = msg;
+        document.body.appendChild(n);
+        setTimeout(() => n.remove(), 2000);
+    }
+    
+    // Запуск
+    createSession();
+    renderCart();
 </script>
 </body>
 </html>
