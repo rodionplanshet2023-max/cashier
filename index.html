@@ -23,21 +23,21 @@
         .manual-input input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-top: 15px; }
         .manual-input button { width: 100%; margin-top: 10px; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; }
         .cart-list { max-height: 400px; overflow-y: auto; margin-top: 15px; }
-        .cart-item { display: flex; align-items: center; gap: 12px; background: #f8f9fa; padding: 12px; margin-bottom: 10px; border-radius: 8px; position: relative; }
+        .cart-item { display: flex; align-items: center; gap: 12px; background: #f8f9fa; padding: 12px; margin-bottom: 10px; border-radius: 8px; }
         .cart-item-info { flex: 1; }
         .cart-item-name { font-weight: 600; }
         .cart-item-code { font-size: 11px; color: #888; margin-top: 4px; }
         .btn-remove { background: #ff4444; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; transition: 0.2s; }
-        .btn-remove:hover { transform: scale(1.1); background: #cc0000; }
-        .btn-remove.admin-mode { background: #ff9800; width: auto; border-radius: 20px; padding: 0 15px; }
+        .btn-remove:hover { transform: scale(1.1); }
+        .btn-remove.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
+        .btn-remove.disabled:hover { transform: none; }
         .actions { display: flex; gap: 15px; margin-top: 20px; }
         .btn-pay { background: linear-gradient(90deg, #4caf50, #43a047); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-exit-admin { background: #ff9800; color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; }
+        .btn-exit-admin { background: #ff9800; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
         .status { padding: 10px; margin-top: 15px; border-radius: 8px; text-align: center; font-size: 14px; }
         .status.online { background: #d4edda; color: #155724; }
         .status.offline { background: #f8d7da; color: #721c24; }
-        .status.admin { background: #fff3cd; color: #856404; }
         .notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; animation: fadeOut 2s ease; z-index: 9999; }
         .notification.admin { background: #ff9800; }
         .notification.error { background: #f44336; }
@@ -46,6 +46,8 @@
         .admin-panel { background: #fff3cd; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: none; }
         .admin-panel h4 { color: #856404; margin-bottom: 10px; }
         .admin-panel .info { font-size: 12px; color: #856404; }
+        .delete-hint { font-size: 11px; color: #ff9800; margin-top: 5px; display: none; }
+        .delete-hint.show { display: block; }
     </style>
 </head>
 <body>
@@ -53,7 +55,7 @@
 <div class="header">
     <div class="logo-text">🏪 ПВЗ Терминал</div>
     <div>
-        <span class="admin-badge" id="adminBadge">👑 Админ режим выключен</span>
+        <span class="admin-badge" id="adminBadge">👑 Админ режим</span>
     </div>
 </div>
 
@@ -76,6 +78,7 @@
             <input type="text" id="manualBarcode" placeholder="Введите штрихкод">
             <button onclick="sendManual()">Добавить</button>
         </div>
+        <div id="adminHint" class="delete-hint">🔐 Для удаления товаров сканируйте код: <strong>admin</strong></div>
     </div>
 
     <div class="card">
@@ -86,17 +89,17 @@
         
         <!-- Админ панель -->
         <div id="adminPanel" class="admin-panel">
-            <h4>🔐 Админ режим АКТИВЕН</h4>
-            <div class="info">✅ Нажми на крестик у товара для удаления</div>
-            <div class="info">📱 Сканируй код админа для выхода</div>
+            <h4>🔐 АДМИН РЕЖИМ АКТИВЕН</h4>
+            <div class="info">✅ Нажми на красный крестик у товара для удаления</div>
+            <div class="info">📱 Сканируй код <strong>admin</strong> для выхода</div>
         </div>
         
         <div id="cartList" class="cart-list"><p style="color:#999; text-align:center;">Сканируйте товары</p></div>
         <div class="actions" id="cartActions" style="display:none;">
             <button class="btn-return" onclick="clearCart()">❌ Очистить</button>
             <button class="btn-pay" onclick="checkout()">✅ Оплатить</button>
-            <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
         </div>
+        <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
     </div>
 </div>
 
@@ -116,9 +119,8 @@
     const db = firebase.database();
     const auth = firebase.auth();
     
-    // Админ код
+    // Админ код (только для переключения режима)
     const ADMIN_CODE = "admin";
-    const ADMIN_PRICE = 67;
     
     let productDB = JSON.parse(localStorage.getItem('productDB')) || {
         "4601234567890": { name: "Молоко", price: 79.90 },
@@ -144,6 +146,7 @@
         const cartCount = document.getElementById('cartCount');
         const actions = document.getElementById('cartActions');
         const exitAdminBtn = document.getElementById('exitAdminBtn');
+        const adminHint = document.getElementById('adminHint');
         
         cartCount.innerText = currentCart.length;
         
@@ -154,24 +157,19 @@
         }
         
         actions.style.display = 'flex';
-        if (isAdminMode) {
-            exitAdminBtn.style.display = 'block';
-        } else {
-            exitAdminBtn.style.display = 'none';
-        }
         
         let total = 0;
         cartList.innerHTML = currentCart.map((item, i) => {
             total += item.price;
-            const deleteBtnText = isAdminMode ? '🗑️ Удалить' : '✕';
-            const deleteBtnClass = isAdminMode ? 'btn-remove admin-mode' : 'btn-remove';
+            const deleteDisabled = !isAdminMode ? 'disabled' : '';
+            const deleteTitle = !isAdminMode ? 'Админ режим выключен. Сканируйте admin' : 'Удалить товар';
             return `
                 <div class="cart-item">
                     <div class="cart-item-info">
                         <div class="cart-item-name">${escapeHtml(item.name)}</div>
                         <div class="cart-item-code">${item.code} • ${item.price} руб.</div>
                     </div>
-                    <button class="${deleteBtnClass}" onclick="handleRemoveItem(${i})">${deleteBtnText}</button>
+                    <button class="btn-remove ${deleteDisabled}" onclick="${isAdminMode ? `removeItem(${i})` : 'showAdminRequired()'}" title="${deleteTitle}" ${!isAdminMode ? 'disabled' : ''}>✕</button>
                 </div>
             `;
         }).join('');
@@ -180,34 +178,41 @@
         totalDiv.style.cssText = 'margin-top:15px; padding-top:15px; border-top:2px solid #ddd; text-align:right; font-weight:bold;';
         totalDiv.innerHTML = `Итого: ${total.toFixed(2)} руб.`;
         cartList.appendChild(totalDiv);
-    }
-    
-    function handleRemoveItem(index) {
-        if (isAdminMode) {
-            // Админ режим - удаляем без вопросов
-            const removedItem = currentCart[index];
-            currentCart.splice(index, 1);
-            saveData();
-            speak(`Товар "${removedItem.name}" удалён админом`);
-            showNotification(`🗑️ Удалён: ${removedItem.name}`, 'admin');
+        
+        // Показываем подсказку если админ режим выключен
+        if (!isAdminMode && currentCart.length > 0) {
+            adminHint.classList.add('show');
         } else {
-            // Обычный режим - просим отсканировать админ код
-            showNotification('🔐 Отсканируйте код администратора для удаления', 'admin');
-            pendingDeleteIndex = index;
+            adminHint.classList.remove('show');
         }
     }
     
+    function showAdminRequired() {
+        showNotification('🔐 Требуется админ режим! Отсканируйте код "admin"', 'admin');
+    }
+    
     function removeItem(index) {
+        if (!isAdminMode) {
+            showAdminRequired();
+            return;
+        }
+        const removedItem = currentCart[index];
         currentCart.splice(index, 1);
         saveData();
-        speak("Товар удален");
+        speak(`Товар "${removedItem.name}" удалён`);
+        showNotification(`🗑️ Удалён: ${removedItem.name}`, 'admin');
     }
     
     function clearCart() { 
+        if(!isAdminMode) {
+            showAdminRequired();
+            return;
+        }
         if(currentCart.length===0)return; 
         currentCart = []; 
         saveData(); 
         speak("Корзина очищена"); 
+        showNotification('🧹 Корзина очищена', 'admin');
     }
     
     function checkout() {
@@ -216,19 +221,20 @@
         speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
         currentCart = [];
         saveData();
+        showNotification(`✅ Оплачено ${total.toFixed(2)} руб.`);
     }
-    
-    let pendingDeleteIndex = null;
     
     function enableAdminMode() {
         isAdminMode = true;
         const badge = document.getElementById('adminBadge');
         const adminPanel = document.getElementById('adminPanel');
+        const exitAdminBtn = document.getElementById('exitAdminBtn');
         badge.innerHTML = '👑 Админ режим ВКЛЮЧЕН';
         badge.classList.add('active');
         adminPanel.style.display = 'block';
+        exitAdminBtn.style.display = 'block';
         renderCart();
-        showNotification('🔓 Админ режим активирован! Нажмите на крестик для удаления товаров', 'admin');
+        showNotification('🔓 Админ режим активирован! Теперь можно удалять товары', 'admin');
         speak("Админ режим активирован");
     }
     
@@ -236,16 +242,20 @@
         isAdminMode = false;
         const badge = document.getElementById('adminBadge');
         const adminPanel = document.getElementById('adminPanel');
-        badge.innerHTML = '👑 Админ режим выключен';
+        const exitAdminBtn = document.getElementById('exitAdminBtn');
+        badge.innerHTML = '👑 Админ режим';
         badge.classList.remove('active');
         adminPanel.style.display = 'none';
+        exitAdminBtn.style.display = 'none';
         renderCart();
         showNotification('🔒 Админ режим выключен', 'admin');
         speak("Админ режим выключен");
     }
     
     function handleScan(barcode) {
-        // Проверка на админ код
+        console.log('Сканировано:', barcode);
+        
+        // Проверка на админ код (переключение режима)
         if (barcode === ADMIN_CODE) {
             if (!isAdminMode) {
                 enableAdminMode();
@@ -255,20 +265,7 @@
             return;
         }
         
-        // Если в админ режиме и есть ожидающее удаление
-        if (isAdminMode && pendingDeleteIndex !== null) {
-            // Проверяем, что отсканирован правильный код
-            if (barcode === ADMIN_CODE) {
-                removeItem(pendingDeleteIndex);
-                pendingDeleteIndex = null;
-                showNotification('✅ Товар удалён', 'admin');
-            } else {
-                showNotification('❌ Неверный код администратора', 'error');
-                pendingDeleteIndex = null;
-            }
-            return;
-        }
-        
+        // Обычное добавление товара
         let product = productDB[barcode];
         if(product) {
             currentCart.push({ code: barcode, name: product.name, price: product.price });
@@ -279,13 +276,6 @@
             let name = prompt(`📦 Новый товар!\nШтрихкод: ${barcode}\n\nВведите название:`);
             if(name && name.trim()) {
                 let price = parseFloat(prompt(`💰 Цена для "${name}":`));
-                
-                // Проверка на админ код
-                if (barcode === ADMIN_CODE && price === ADMIN_PRICE) {
-                    enableAdminMode();
-                    return;
-                }
-                
                 if(price > 0) {
                     productDB[barcode] = { name: name.trim(), price: price };
                     currentCart.push({ code: barcode, name: name.trim(), price: price });
@@ -328,7 +318,10 @@
         document.getElementById('connectionStatus').className = 'status online';
     }
     
-    function copyData() { navigator.clipboard.writeText(`Код: ${currentSessionId}\nПароль: ${currentPassword}`); showNotification('✅ Скопировано!'); }
+    function copyData() { 
+        navigator.clipboard.writeText(`Код: ${currentSessionId}\nПароль: ${currentPassword}`); 
+        showNotification('✅ Скопировано!'); 
+    }
     
     function speak(text) { 
         if('speechSynthesis' in window) { 
