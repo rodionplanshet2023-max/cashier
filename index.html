@@ -46,9 +46,10 @@
         .admin-panel { background: #fff3cd; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: none; }
         .admin-panel h4 { color: #856404; margin-bottom: 10px; }
         .admin-panel .info { font-size: 12px; color: #856404; }
-        .admin-hint { background: #e8f0fe; padding: 10px; border-radius: 8px; margin-top: 15px; text-align: center; font-size: 13px; }
-        .admin-code { font-family: monospace; font-size: 18px; font-weight: bold; color: #1a73e8; background: white; padding: 5px 10px; border-radius: 6px; display: inline-block; margin: 5px 0; }
-        .debug-log { background: #1e1e1e; color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 6px; margin-top: 10px; max-height: 100px; overflow-y: auto; display: none; }
+        .admin-hint { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center; }
+        .admin-card { background: white; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin: 10px 0; text-align: center; }
+        .admin-card .code { font-size: 20px; font-family: monospace; background: #f0f0f0; padding: 8px; border-radius: 6px; margin: 10px 0; }
+        .btn-create-admin { background: #ff9800; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -73,12 +74,14 @@
         <div id="connectionStatus" class="status offline">🟡 Ожидание сканера...</div>
         
         <div class="admin-hint">
-            🔐 <strong>АДМИН КОД ДЛЯ СКАНИРОВАНИЯ:</strong> 
-            <div class="admin-code" style="font-size: 28px;">admin</div>
-            <small>Отсканируйте этот код для включения админ режима</small>
+            <strong>🔐 АДМИН ШТРИХКОД</strong>
+            <div class="admin-card">
+                <div>Отсканируйте этот штрихкод для входа в админ режим:</div>
+                <div class="code" id="adminBarcodeDisplay">⚠️ Создайте админ код</div>
+                <button class="btn-create-admin" onclick="createAdminBarcode()">🆕 Создать админ штрихкод</button>
+                <div style="font-size: 11px; margin-top: 10px; color: #666;">Товар с именем "admin" и ценой 67</div>
+            </div>
         </div>
-        <button onclick="toggleDebug()" style="margin-top:10px; background:#333; padding:5px;">🐛 Показать отладку</button>
-        <div id="debugLog" class="debug-log"></div>
     </div>
 
     <div class="card">
@@ -87,8 +90,6 @@
             <input type="text" id="manualBarcode" placeholder="Введите штрихкод">
             <button onclick="sendManual()">Добавить</button>
         </div>
-        <button onclick="testAdminMode()" style="margin-top:10px; background:#ff9800;">🔐 Тест: Включить админ режим</button>
-        <button onclick="testExitAdminMode()" style="margin-top:10px; background:#ff9800;">🔒 Тест: Выключить админ режим</button>
     </div>
 
     <div class="card">
@@ -100,7 +101,7 @@
         <div id="adminPanel" class="admin-panel">
             <h4>🔐 АДМИН РЕЖИМ АКТИВЕН</h4>
             <div class="info">✅ Нажми на красный крестик у товара для удаления</div>
-            <div class="info">📱 Сканируй код <strong>admin</strong> для выхода</div>
+            <div class="info">📱 Сканируй админ штрихкод для выхода</div>
         </div>
         
         <div id="cartList" class="cart-list"><p style="color:#999; text-align:center;">Сканируйте товары</p></div>
@@ -128,9 +129,6 @@
     const db = firebase.database();
     const auth = firebase.auth();
     
-    // Админ код
-    const ADMIN_CODE = "admin";
-    
     let productDB = JSON.parse(localStorage.getItem('productDB')) || {
         "4601234567890": { name: "Молоко", price: 79.90 },
         "6901234567892": { name: "Хлеб", price: 45.00 },
@@ -141,30 +139,40 @@
     let sessionRef = null;
     let currentPassword = null;
     let isAdminMode = false;
+    let adminBarcode = null;
     
     auth.signInAnonymously().catch(console.error);
     
-    function addDebugLog(msg) {
-        const logDiv = document.getElementById('debugLog');
-        const time = new Date().toLocaleTimeString();
-        logDiv.innerHTML += `[${time}] ${msg}\n`;
-        logDiv.scrollTop = logDiv.scrollHeight;
-        console.log(msg);
+    // Поиск админ кода в базе
+    function findAdminBarcode() {
+        for (const [barcode, product] of Object.entries(productDB)) {
+            if (product.name === "admin" && product.price === 67) {
+                adminBarcode = barcode;
+                document.getElementById('adminBarcodeDisplay').innerHTML = `<strong>${barcode}</strong><br><small>Отсканируйте этот код</small>`;
+                return barcode;
+            }
+        }
+        document.getElementById('adminBarcodeDisplay').innerHTML = '❌ Админ код не найден<br><small>Нажмите "Создать"</small>';
+        return null;
     }
     
-    function toggleDebug() {
-        const logDiv = document.getElementById('debugLog');
-        if (logDiv.style.display === 'none') {
-            logDiv.style.display = 'block';
-        } else {
-            logDiv.style.display = 'none';
-        }
+    // Создать админ штрихкод
+    function createAdminBarcode() {
+        const newBarcode = "ADMIN" + Math.floor(Math.random() * 1000000);
+        productDB[newBarcode] = { name: "admin", price: 67 };
+        localStorage.setItem('productDB', JSON.stringify(productDB));
+        adminBarcode = newBarcode;
+        document.getElementById('adminBarcodeDisplay').innerHTML = `<strong>${newBarcode}</strong><br><small>Отсканируйте этот код</small>`;
+        showNotification(`✅ Создан админ код: ${newBarcode}`, 'admin');
+        speak("Админ код создан");
+        renderCart();
     }
     
     function saveData() {
         localStorage.setItem('productDB', JSON.stringify(productDB));
         localStorage.setItem('currentCart', JSON.stringify(currentCart));
         renderCart();
+        findAdminBarcode(); // Обновляем отображение админ кода
     }
     
     function renderCart() {
@@ -187,7 +195,7 @@
         cartList.innerHTML = currentCart.map((item, i) => {
             total += item.price;
             const deleteDisabled = !isAdminMode ? 'disabled' : '';
-            const deleteTitle = !isAdminMode ? 'Админ режим выключен. Отсканируйте admin' : 'Удалить товар';
+            const deleteTitle = !isAdminMode ? 'Админ режим выключен. Отсканируйте админ код' : 'Удалить товар';
             return `
                 <div class="cart-item">
                     <div class="cart-item-info">
@@ -212,7 +220,7 @@
     }
     
     function showAdminRequired() {
-        showNotification('🔐 Требуется админ режим! Отсканируйте код "admin"', 'admin');
+        showNotification('🔐 Требуется админ режим! Отсканируйте админ штрихкод', 'admin');
     }
     
     function removeItem(index) {
@@ -225,7 +233,6 @@
         saveData();
         speak(`Товар "${removedItem.name}" удалён`);
         showNotification(`🗑️ Удалён: ${removedItem.name}`, 'admin');
-        addDebugLog(`Удалён товар: ${removedItem.name}`);
     }
     
     function clearCart() { 
@@ -238,7 +245,6 @@
         saveData(); 
         speak("Корзина очищена"); 
         showNotification('🧹 Корзина очищена', 'admin');
-        addDebugLog('Корзина очищена');
     }
     
     function checkout() {
@@ -251,7 +257,6 @@
     }
     
     function enableAdminMode() {
-        addDebugLog('Включение админ режима...');
         isAdminMode = true;
         const badge = document.getElementById('adminBadge');
         const adminPanel = document.getElementById('adminPanel');
@@ -261,11 +266,9 @@
         renderCart();
         showNotification('🔓 Админ режим активирован! Теперь можно удалять товары', 'admin');
         speak("Админ режим активирован");
-        addDebugLog('Админ режим ВКЛЮЧЕН');
     }
     
     function exitAdminMode() {
-        addDebugLog('Выключение админ режима...');
         isAdminMode = false;
         const badge = document.getElementById('adminBadge');
         const adminPanel = document.getElementById('adminPanel');
@@ -275,48 +278,30 @@
         renderCart();
         showNotification('🔒 Админ режим выключен', 'admin');
         speak("Админ режим выключен");
-        addDebugLog('Админ режим ВЫКЛЮЧЕН');
-    }
-    
-    // Тестовые кнопки
-    function testAdminMode() {
-        addDebugLog('Тестовая кнопка: включение админ режима');
-        enableAdminMode();
-    }
-    
-    function testExitAdminMode() {
-        addDebugLog('Тестовая кнопка: выключение админ режима');
-        exitAdminMode();
     }
     
     function handleScan(barcode) {
-        addDebugLog(`Получен штрихкод: "${barcode}" (тип: ${typeof barcode}, длина: ${barcode?.length})`);
+        console.log('Сканировано:', barcode);
         
-        // ПРИНУДИТЕЛЬНАЯ ПРОВЕРКА НА АДМИН КОД
-        // Сравниваем без учета регистра и обрезаем пробелы
-        const cleanBarcode = String(barcode).trim().toLowerCase();
-        addDebugLog(`Очищенный код: "${cleanBarcode}"`);
+        let product = productDB[barcode];
         
-        if (cleanBarcode === "admin") {
-            addDebugLog('✅ ОБНАРУЖЕН АДМИН КОД! Переключаем режим...');
+        // Проверка на админ код (товар с именем "admin" и ценой 67)
+        if (product && product.name === "admin" && product.price === 67) {
+            console.log('Обнаружен админ код! Переключаем режим');
             if (!isAdminMode) {
                 enableAdminMode();
             } else {
                 exitAdminMode();
             }
-            return; // ВАЖНО: выходим, не добавляем в корзину
+            return; // НЕ добавляем в корзину
         }
         
-        addDebugLog('Обычный товар, добавляем в корзину');
-        
         // Обычное добавление товара
-        let product = productDB[barcode];
         if(product) {
             currentCart.push({ code: barcode, name: product.name, price: product.price });
             saveData();
             speak(`Добавлен ${product.name}`);
             showNotification(`✅ ${product.name} - ${product.price} руб.`);
-            addDebugLog(`Добавлен товар: ${product.name} (${barcode})`);
         } else {
             let name = prompt(`📦 Новый товар!\nШтрихкод: ${barcode}\n\nВведите название:`);
             if(name && name.trim()) {
@@ -327,7 +312,6 @@
                     saveData();
                     speak(`Добавлен новый товар: ${name}`);
                     showNotification(`✅ Новый: ${name} - ${price} руб.`);
-                    addDebugLog(`Добавлен НОВЫЙ товар: ${name} (${barcode}) цена: ${price}`);
                 }
             }
         }
@@ -351,7 +335,6 @@
         sessionRef.onDisconnect().remove();
         sessionRef.child('scannedCode').on('value', (snapshot) => {
             const code = snapshot.val();
-            addDebugLog(`Firebase получил код: "${code}"`);
             if(code && code !== "") {
                 handleScan(code);
                 const st = document.getElementById('connectionStatus');
@@ -363,7 +346,6 @@
         });
         document.getElementById('connectionStatus').innerHTML = '🟢 Сканер готов!';
         document.getElementById('connectionStatus').className = 'status online';
-        addDebugLog(`Сессия создана: ${currentSessionId}, пароль: ${currentPassword}`);
     }
     
     function copyData() { 
@@ -398,10 +380,7 @@
     
     createSession();
     renderCart();
-    
-    // Выводим в консоль для отладки
-    console.log('Приложение загружено, ADMIN_CODE =', ADMIN_CODE);
-    addDebugLog('Приложение загружено');
+    findAdminBarcode();
 </script>
 </body>
 </html>
