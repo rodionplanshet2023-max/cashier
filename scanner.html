@@ -112,7 +112,6 @@
 </div>
 
 <script>
-    // Firebase конфиг
     const firebaseConfig = {
         apiKey: "AIzaSyDAwSnBo0_omIX8iYyogAF3sOSbAd-36f4",
         authDomain: "kassa-41e44.firebaseapp.com",
@@ -129,8 +128,8 @@
     
     let activeSessionId = null;
     let html5QrcodeScanner = null;
-    let isScanning = false;
     
+    // Вход без AppCheck
     auth.signInAnonymously().catch(e => console.error("Auth Error:", e));
     
     function attemptConnection() {
@@ -185,7 +184,8 @@
                     setTimeout(() => {
                         statusEl.innerHTML = "📷 Готов к сканированию";
                     }, 1500);
-                }).catch(() => {
+                }).catch((err) => {
+                    console.error(err);
                     statusEl.innerHTML = "❌ Ошибка отправки";
                     statusEl.style.color = "#f44336";
                     setTimeout(() => {
@@ -199,8 +199,6 @@
             console.error("Camera error:", err);
             alert("Ошибка камеры: " + err);
         });
-        
-        isScanning = true;
     }
 </script>
 </body>
