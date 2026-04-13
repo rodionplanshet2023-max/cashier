@@ -9,173 +9,31 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f0f2f5;
-            padding: 20px;
-        }
-        .header {
-            background: white;
-            padding: 15px 25px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .logo-text {
-            font-size: 24px;
-            font-weight: 800;
-            background: linear-gradient(90deg, #005bff, #cb11ab);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .session-info {
-            background: #e8f0fe;
-            padding: 15px 25px;
-            border-radius: 12px;
-            text-align: center;
-        }
-        .session-code {
-            font-size: 48px;
-            font-weight: bold;
-            color: #1a73e8;
-            font-family: monospace;
-            letter-spacing: 5px;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 10px;
-            margin: 10px 0;
-        }
-        .session-pass {
-            font-size: 28px;
-            font-weight: bold;
-            color: #d93025;
-            font-family: monospace;
-            letter-spacing: 3px;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 10px;
-            margin: 10px 0;
-        }
-        .container {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .card {
-            flex: 1;
-            min-width: 300px;
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .manual-input input {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        .manual-input button {
-            width: 100%;
-            margin-top: 10px;
-            padding: 12px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        .cart-list {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-top: 15px;
-        }
-        .cart-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: #f8f9fa;
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
+        .header { background: white; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .logo-text { font-size: 24px; font-weight: 800; background: linear-gradient(90deg, #005bff, #cb11ab); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .session-info { background: #e8f0fe; padding: 15px 25px; border-radius: 12px; text-align: center; }
+        .session-code { font-size: 48px; font-weight: bold; color: #1a73e8; font-family: monospace; background: white; padding: 10px 20px; border-radius: 10px; margin: 10px 0; }
+        .session-pass { font-size: 28px; font-weight: bold; color: #d93025; font-family: monospace; background: white; padding: 10px 20px; border-radius: 10px; margin: 10px 0; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .card { flex: 1; min-width: 300px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .manual-input input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-top: 15px; }
+        .manual-input button { width: 100%; margin-top: 10px; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .cart-list { max-height: 400px; overflow-y: auto; margin-top: 15px; }
+        .cart-item { display: flex; align-items: center; gap: 12px; background: #f8f9fa; padding: 12px; margin-bottom: 10px; border-radius: 8px; }
         .cart-item-info { flex: 1; }
         .cart-item-name { font-weight: 600; }
         .cart-item-code { font-size: 11px; color: #888; margin-top: 4px; }
-        .btn-remove {
-            background: #ff4444;
-            color: white;
-            border: none;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        .actions {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-        }
-        .btn-pay {
-            background: linear-gradient(90deg, #4caf50, #43a047);
-            color: white;
-            flex: 1;
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .btn-return {
-            background: linear-gradient(90deg, #f44336, #e53935);
-            color: white;
-            flex: 1;
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .status {
-            padding: 10px;
-            margin-top: 15px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 14px;
-        }
+        .btn-remove { background: #ff4444; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
+        .actions { display: flex; gap: 15px; margin-top: 20px; }
+        .btn-pay { background: linear-gradient(90deg, #4caf50, #43a047); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .status { padding: 10px; margin-top: 15px; border-radius: 8px; text-align: center; font-size: 14px; }
         .status.online { background: #d4edda; color: #155724; }
         .status.offline { background: #f8d7da; color: #721c24; }
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #28a745;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            animation: fadeOut 2s ease;
-            z-index: 9999;
-        }
-        @keyframes fadeOut {
-            0% { opacity: 1; }
-            70% { opacity: 1; }
-            100% { opacity: 0; }
-        }
-        .copy-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; animation: fadeOut 2s ease; z-index: 9999; }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+        .copy-btn { background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -188,20 +46,20 @@
     <div class="card">
         <h3>🔑 Данные для подключения сканера</h3>
         <div class="session-info">
-            <div>📱 Код терминала (введи в телефоне)</div>
-            <div class="session-code" id="sessionCode">Загрузка...</div>
-            <div>🔐 Пароль (введи в телефоне)</div>
-            <div class="session-pass" id="sessionPass">Загрузка...</div>
-            <button class="copy-btn" onclick="copyData()">📋 Копировать код и пароль</button>
+            <div>📱 Код терминала</div>
+            <div class="session-code" id="sessionCode">---</div>
+            <div>🔐 Пароль</div>
+            <div class="session-pass" id="sessionPass">---</div>
+            <button class="copy-btn" onclick="copyData()">📋 Копировать</button>
         </div>
-        <div id="connectionStatus" class="status offline">🟡 Ожидание подключения сканера...</div>
+        <div id="connectionStatus" class="status offline">🟡 Ожидание сканера...</div>
     </div>
 
     <div class="card">
         <h3>📷 Ручной ввод</h3>
         <div class="manual-input">
-            <input type="text" id="manualBarcode" placeholder="Введите штрихкод вручную">
-            <button onclick="sendManual()">Добавить товар</button>
+            <input type="text" id="manualBarcode" placeholder="Введите штрихкод">
+            <button onclick="sendManual()">Добавить</button>
         </div>
     </div>
 
@@ -210,9 +68,7 @@
             <h3>🛒 Корзина</h3>
             <span id="cartCount" style="background:#005bff; color:white; padding:2px 10px; border-radius:12px;">0</span>
         </div>
-        <div id="cartList" class="cart-list">
-            <p style="color:#999; text-align:center;">Сканируйте товары</p>
-        </div>
+        <div id="cartList" class="cart-list"><p style="color:#999; text-align:center;">Сканируйте товары</p></div>
         <div class="actions" id="cartActions" style="display:none;">
             <button class="btn-return" onclick="clearCart()">❌ Очистить</button>
             <button class="btn-pay" onclick="checkout()">✅ Оплатить</button>
@@ -221,15 +77,16 @@
 </div>
 
 <script>
+    // ============ ВСТАВЬ СВОЙ FIREBASE КОНФИГ СЮДА ============
     const firebaseConfig = {
-        apiKey: "AIzaSyDAwSnBo0_omIX8iYyogAF3sOSbAd-36f4",
-        authDomain: "kassa-41e44.firebaseapp.com",
-        databaseURL: "https://kassa-41e44-default-rtdb.firebaseio.com",
-        projectId: "kassa-41e44",
-        storageBucket: "kassa-41e44.firebasestorage.app",
-        messagingSenderId: "743733243080",
-        appId: "1:743733243080:web:b7fe8609e4e8c61b8809fd"
+      apiKey: "AIzaSyAQVrsSUqhrgujZ4L9UqTKdfR2AByigeD0",
+      authDomain: "cashier-terminal.firebaseapp.com",
+      projectId: "cashier-terminal",
+      storageBucket: "cashier-terminal.firebasestorage.app",
+      messagingSenderId: "152891465999",
+      appId: "1:152891465999:web:f3e58d7f63b31d37371e7a"
     };
+    // ====================================================
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -257,30 +114,18 @@
         const cartList = document.getElementById('cartList');
         const cartCount = document.getElementById('cartCount');
         const actions = document.getElementById('cartActions');
-        
         cartCount.innerText = currentCart.length;
-        
         if (currentCart.length === 0) {
             cartList.innerHTML = '<p style="color:#999; text-align:center;">Сканируйте товары</p>';
             actions.style.display = 'none';
             return;
         }
-        
         actions.style.display = 'flex';
         let total = 0;
         cartList.innerHTML = currentCart.map((item, i) => {
             total += item.price;
-            return `
-                <div class="cart-item">
-                    <div class="cart-item-info">
-                        <div class="cart-item-name">${escapeHtml(item.name)}</div>
-                        <div class="cart-item-code">${item.code} • ${item.price} руб.</div>
-                    </div>
-                    <button class="btn-remove" onclick="removeItem(${i})">✕</button>
-                </div>
-            `;
+            return `<div class="cart-item"><div class="cart-item-info"><div class="cart-item-name">${escapeHtml(item.name)}</div><div class="cart-item-code">${item.code} • ${item.price} руб.</div></div><button class="btn-remove" onclick="removeItem(${i})">✕</button></div>`;
         }).join('');
-        
         const totalDiv = document.createElement('div');
         totalDiv.style.cssText = 'margin-top:15px; padding-top:15px; border-top:2px solid #ddd; text-align:right; font-weight:bold;';
         totalDiv.innerHTML = `Итого: ${total.toFixed(2)} руб.`;
@@ -290,95 +135,58 @@
     function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
     function removeItem(i) { currentCart.splice(i,1); saveData(); speak("Товар удален"); }
     function clearCart() { if(currentCart.length===0)return; currentCart = []; saveData(); speak("Корзина очищена"); }
-    
-    function checkout() {
-        if(currentCart.length===0) return;
-        let total = currentCart.reduce((s,i)=>s+i.price,0);
-        speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
-        currentCart = [];
-        saveData();
-    }
+    function checkout() { if(currentCart.length===0)return; let total = currentCart.reduce((s,i)=>s+i.price,0); speak(`Оплачено ${total.toFixed(2)} рублей`); currentCart = []; saveData(); }
     
     function handleScan(barcode) {
         let product = productDB[barcode];
         if(product) {
             currentCart.push({ code: barcode, name: product.name, price: product.price });
             saveData();
-            speak(`Добавлен ${product.name}, ${product.price} рублей`);
+            speak(`Добавлен ${product.name}`);
             showNotification(`✅ ${product.name} - ${product.price} руб.`);
         } else {
-            let name = prompt(`📦 Новый товар!\nШтрихкод: ${barcode}\n\nВведите название:`);
+            let name = prompt(`Новый товар!\nШтрихкод: ${barcode}\nНазвание:`);
             if(name && name.trim()) {
-                let price = parseFloat(prompt(`💰 Цена для "${name}":`));
+                let price = parseFloat(prompt(`Цена:`));
                 if(price > 0) {
                     productDB[barcode] = { name: name.trim(), price: price };
                     currentCart.push({ code: barcode, name: name.trim(), price: price });
                     saveData();
-                    speak(`Добавлен новый товар: ${name}`);
+                    speak(`Добавлен ${name}`);
                     showNotification(`✅ Новый: ${name} - ${price} руб.`);
                 }
             }
         }
     }
     
-    function sendManual() {
-        let barcode = document.getElementById('manualBarcode').value.trim();
-        if(barcode) { handleScan(barcode); document.getElementById('manualBarcode').value = ''; }
-    }
+    function sendManual() { let b = document.getElementById('manualBarcode').value.trim(); if(b) { handleScan(b); document.getElementById('manualBarcode').value = ''; } }
     
     function createSession() {
         currentSessionId = Math.floor(100000 + Math.random() * 900000).toString();
         currentPassword = Math.random().toString(36).slice(-8).toUpperCase();
-        
         document.getElementById('sessionCode').innerText = currentSessionId;
         document.getElementById('sessionPass').innerText = currentPassword;
-        
         sessionRef = db.ref('sessions/' + currentSessionId);
         sessionRef.set({ password: currentPassword, active: true, scannedCode: "" });
         sessionRef.onDisconnect().remove();
-        
         sessionRef.child('scannedCode').on('value', (snapshot) => {
             const code = snapshot.val();
             if(code && code !== "") {
                 handleScan(code);
-                const statusDiv = document.getElementById('connectionStatus');
-                statusDiv.innerHTML = '🟢 Сканирование получено!';
-                statusDiv.className = 'status online';
-                setTimeout(() => {
-                    statusDiv.innerHTML = '🟡 Ожидание сканирования...';
-                    statusDiv.className = 'status offline';
-                }, 2000);
+                const st = document.getElementById('connectionStatus');
+                st.innerHTML = '🟢 Сканирование получено!';
+                st.className = 'status online';
+                setTimeout(() => { st.innerHTML = '🟡 Ожидание...'; st.className = 'status offline'; }, 2000);
                 sessionRef.update({ scannedCode: "" });
             }
         });
-        
-        const statusDiv = document.getElementById('connectionStatus');
-        statusDiv.innerHTML = '🟢 Сканер готов к подключению!';
-        statusDiv.className = 'status online';
+        document.getElementById('connectionStatus').innerHTML = '🟢 Сканер готов!';
+        document.getElementById('connectionStatus').className = 'status online';
     }
     
-    function copyData() {
-        const text = `Код: ${currentSessionId}\nПароль: ${currentPassword}`;
-        navigator.clipboard.writeText(text);
-        showNotification('✅ Код и пароль скопированы!');
-    }
-    
-    function speak(text) {
-        if('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            let u = new SpeechSynthesisUtterance(text);
-            u.lang = 'ru-RU';
-            window.speechSynthesis.speak(u);
-        }
-    }
-    
-    function showNotification(msg) {
-        let n = document.createElement('div');
-        n.className = 'notification';
-        n.textContent = msg;
-        document.body.appendChild(n);
-        setTimeout(() => n.remove(), 2000);
-    }
+    function copyData() { navigator.clipboard.writeText(`Код: ${currentSessionId}\nПароль: ${currentPassword}`); showNotification('✅ Скопировано!'); }
+    function speak(text) { if('speechSynthesis' in window) { window.speechSynthesis.cancel(); let u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; window.speechSynthesis.speak(u); } }
+    function showNotification(msg) { let n = document.createElement('div'); n.className = 'notification'; n.textContent = msg; document.body.appendChild(n); setTimeout(() => n.remove(), 2000); }
     
     createSession();
     renderCart();
