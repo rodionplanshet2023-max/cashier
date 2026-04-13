@@ -12,6 +12,9 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .header { background: white; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .logo-text { font-size: 24px; font-weight: 800; background: linear-gradient(90deg, #005bff, #cb11ab); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .admin-badge { background: #ff9800; color: white; padding: 5px 15px; border-radius: 20px; font-size: 14px; font-weight: bold; display: inline-block; }
+        .admin-badge.active { background: #f44336; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         .session-info { background: #e8f0fe; padding: 15px 25px; border-radius: 12px; text-align: center; }
         .session-code { font-size: 48px; font-weight: bold; color: #1a73e8; font-family: monospace; background: white; padding: 10px 20px; border-radius: 10px; margin: 10px 0; }
         .session-pass { font-size: 28px; font-weight: bold; color: #d93025; font-family: monospace; background: white; padding: 10px 20px; border-radius: 10px; margin: 10px 0; }
@@ -20,26 +23,38 @@
         .manual-input input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-top: 15px; }
         .manual-input button { width: 100%; margin-top: 10px; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; }
         .cart-list { max-height: 400px; overflow-y: auto; margin-top: 15px; }
-        .cart-item { display: flex; align-items: center; gap: 12px; background: #f8f9fa; padding: 12px; margin-bottom: 10px; border-radius: 8px; }
+        .cart-item { display: flex; align-items: center; gap: 12px; background: #f8f9fa; padding: 12px; margin-bottom: 10px; border-radius: 8px; position: relative; }
         .cart-item-info { flex: 1; }
         .cart-item-name { font-weight: 600; }
         .cart-item-code { font-size: 11px; color: #888; margin-top: 4px; }
-        .btn-remove { background: #ff4444; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
+        .btn-remove { background: #ff4444; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; transition: 0.2s; }
+        .btn-remove:hover { transform: scale(1.1); background: #cc0000; }
+        .btn-remove.admin-mode { background: #ff9800; width: auto; border-radius: 20px; padding: 0 15px; }
         .actions { display: flex; gap: 15px; margin-top: 20px; }
         .btn-pay { background: linear-gradient(90deg, #4caf50, #43a047); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-exit-admin { background: #ff9800; color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; }
         .status { padding: 10px; margin-top: 15px; border-radius: 8px; text-align: center; font-size: 14px; }
         .status.online { background: #d4edda; color: #155724; }
         .status.offline { background: #f8d7da; color: #721c24; }
+        .status.admin { background: #fff3cd; color: #856404; }
         .notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; animation: fadeOut 2s ease; z-index: 9999; }
+        .notification.admin { background: #ff9800; }
+        .notification.error { background: #f44336; }
         @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
         .copy-btn { background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        .admin-panel { background: #fff3cd; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: none; }
+        .admin-panel h4 { color: #856404; margin-bottom: 10px; }
+        .admin-panel .info { font-size: 12px; color: #856404; }
     </style>
 </head>
 <body>
 
 <div class="header">
     <div class="logo-text">🏪 ПВЗ Терминал</div>
+    <div>
+        <span class="admin-badge" id="adminBadge">👑 Админ режим выключен</span>
+    </div>
 </div>
 
 <div class="container">
@@ -64,14 +79,23 @@
     </div>
 
     <div class="card">
-        <div style="display: flex; justify-content: space-between;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>🛒 Корзина</h3>
             <span id="cartCount" style="background:#005bff; color:white; padding:2px 10px; border-radius:12px;">0</span>
         </div>
+        
+        <!-- Админ панель -->
+        <div id="adminPanel" class="admin-panel">
+            <h4>🔐 Админ режим АКТИВЕН</h4>
+            <div class="info">✅ Нажми на крестик у товара для удаления</div>
+            <div class="info">📱 Сканируй код админа для выхода</div>
+        </div>
+        
         <div id="cartList" class="cart-list"><p style="color:#999; text-align:center;">Сканируйте товары</p></div>
         <div class="actions" id="cartActions" style="display:none;">
             <button class="btn-return" onclick="clearCart()">❌ Очистить</button>
             <button class="btn-pay" onclick="checkout()">✅ Оплатить</button>
+            <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
         </div>
     </div>
 </div>
@@ -85,12 +109,16 @@
       storageBucket: "cashier-terminal.firebasestorage.app",
       messagingSenderId: "152891465999",
       appId: "1:152891465999:web:f3e58d7f63b31d37371e7a"
-    };  
+    };
     // ====================================================
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
+    
+    // Админ код
+    const ADMIN_CODE = "admin";
+    const ADMIN_PRICE = 67;
     
     let productDB = JSON.parse(localStorage.getItem('productDB')) || {
         "4601234567890": { name: "Молоко", price: 79.90 },
@@ -101,6 +129,7 @@
     let currentSessionId = null;
     let sessionRef = null;
     let currentPassword = null;
+    let isAdminMode = false;
     
     auth.signInAnonymously().catch(console.error);
     
@@ -114,30 +143,132 @@
         const cartList = document.getElementById('cartList');
         const cartCount = document.getElementById('cartCount');
         const actions = document.getElementById('cartActions');
+        const exitAdminBtn = document.getElementById('exitAdminBtn');
+        
         cartCount.innerText = currentCart.length;
+        
         if (currentCart.length === 0) {
             cartList.innerHTML = '<p style="color:#999; text-align:center;">Сканируйте товары</p>';
             actions.style.display = 'none';
             return;
         }
+        
         actions.style.display = 'flex';
+        if (isAdminMode) {
+            exitAdminBtn.style.display = 'block';
+        } else {
+            exitAdminBtn.style.display = 'none';
+        }
+        
         let total = 0;
         cartList.innerHTML = currentCart.map((item, i) => {
             total += item.price;
-            return `<div class="cart-item"><div class="cart-item-info"><div class="cart-item-name">${escapeHtml(item.name)}</div><div class="cart-item-code">${item.code} • ${item.price} руб.</div></div><button class="btn-remove" onclick="removeItem(${i})">✕</button></div>`;
+            const deleteBtnText = isAdminMode ? '🗑️ Удалить' : '✕';
+            const deleteBtnClass = isAdminMode ? 'btn-remove admin-mode' : 'btn-remove';
+            return `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <div class="cart-item-name">${escapeHtml(item.name)}</div>
+                        <div class="cart-item-code">${item.code} • ${item.price} руб.</div>
+                    </div>
+                    <button class="${deleteBtnClass}" onclick="handleRemoveItem(${i})">${deleteBtnText}</button>
+                </div>
+            `;
         }).join('');
+        
         const totalDiv = document.createElement('div');
         totalDiv.style.cssText = 'margin-top:15px; padding-top:15px; border-top:2px solid #ddd; text-align:right; font-weight:bold;';
         totalDiv.innerHTML = `Итого: ${total.toFixed(2)} руб.`;
         cartList.appendChild(totalDiv);
     }
     
-    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
-    function removeItem(i) { currentCart.splice(i,1); saveData(); speak("Товар удален"); }
-    function clearCart() { if(currentCart.length===0)return; currentCart = []; saveData(); speak("Корзина очищена"); }
-    function checkout() { if(currentCart.length===0)return; let total = currentCart.reduce((s,i)=>s+i.price,0); speak(`Оплачено ${total.toFixed(2)} рублей`); currentCart = []; saveData(); }
+    function handleRemoveItem(index) {
+        if (isAdminMode) {
+            // Админ режим - удаляем без вопросов
+            const removedItem = currentCart[index];
+            currentCart.splice(index, 1);
+            saveData();
+            speak(`Товар "${removedItem.name}" удалён админом`);
+            showNotification(`🗑️ Удалён: ${removedItem.name}`, 'admin');
+        } else {
+            // Обычный режим - просим отсканировать админ код
+            showNotification('🔐 Отсканируйте код администратора для удаления', 'admin');
+            pendingDeleteIndex = index;
+        }
+    }
+    
+    function removeItem(index) {
+        currentCart.splice(index, 1);
+        saveData();
+        speak("Товар удален");
+    }
+    
+    function clearCart() { 
+        if(currentCart.length===0)return; 
+        currentCart = []; 
+        saveData(); 
+        speak("Корзина очищена"); 
+    }
+    
+    function checkout() {
+        if(currentCart.length===0) return;
+        let total = currentCart.reduce((s,i)=>s+i.price,0);
+        speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
+        currentCart = [];
+        saveData();
+    }
+    
+    let pendingDeleteIndex = null;
+    
+    function enableAdminMode() {
+        isAdminMode = true;
+        const badge = document.getElementById('adminBadge');
+        const adminPanel = document.getElementById('adminPanel');
+        badge.innerHTML = '👑 Админ режим ВКЛЮЧЕН';
+        badge.classList.add('active');
+        adminPanel.style.display = 'block';
+        renderCart();
+        showNotification('🔓 Админ режим активирован! Нажмите на крестик для удаления товаров', 'admin');
+        speak("Админ режим активирован");
+    }
+    
+    function exitAdminMode() {
+        isAdminMode = false;
+        const badge = document.getElementById('adminBadge');
+        const adminPanel = document.getElementById('adminPanel');
+        badge.innerHTML = '👑 Админ режим выключен';
+        badge.classList.remove('active');
+        adminPanel.style.display = 'none';
+        renderCart();
+        showNotification('🔒 Админ режим выключен', 'admin');
+        speak("Админ режим выключен");
+    }
     
     function handleScan(barcode) {
+        // Проверка на админ код
+        if (barcode === ADMIN_CODE) {
+            if (!isAdminMode) {
+                enableAdminMode();
+            } else {
+                exitAdminMode();
+            }
+            return;
+        }
+        
+        // Если в админ режиме и есть ожидающее удаление
+        if (isAdminMode && pendingDeleteIndex !== null) {
+            // Проверяем, что отсканирован правильный код
+            if (barcode === ADMIN_CODE) {
+                removeItem(pendingDeleteIndex);
+                pendingDeleteIndex = null;
+                showNotification('✅ Товар удалён', 'admin');
+            } else {
+                showNotification('❌ Неверный код администратора', 'error');
+                pendingDeleteIndex = null;
+            }
+            return;
+        }
+        
         let product = productDB[barcode];
         if(product) {
             currentCart.push({ code: barcode, name: product.name, price: product.price });
@@ -145,21 +276,34 @@
             speak(`Добавлен ${product.name}`);
             showNotification(`✅ ${product.name} - ${product.price} руб.`);
         } else {
-            let name = prompt(`Новый товар!\nШтрихкод: ${barcode}\nНазвание:`);
+            let name = prompt(`📦 Новый товар!\nШтрихкод: ${barcode}\n\nВведите название:`);
             if(name && name.trim()) {
-                let price = parseFloat(prompt(`Цена:`));
+                let price = parseFloat(prompt(`💰 Цена для "${name}":`));
+                
+                // Проверка на админ код
+                if (barcode === ADMIN_CODE && price === ADMIN_PRICE) {
+                    enableAdminMode();
+                    return;
+                }
+                
                 if(price > 0) {
                     productDB[barcode] = { name: name.trim(), price: price };
                     currentCart.push({ code: barcode, name: name.trim(), price: price });
                     saveData();
-                    speak(`Добавлен ${name}`);
+                    speak(`Добавлен новый товар: ${name}`);
                     showNotification(`✅ Новый: ${name} - ${price} руб.`);
                 }
             }
         }
     }
     
-    function sendManual() { let b = document.getElementById('manualBarcode').value.trim(); if(b) { handleScan(b); document.getElementById('manualBarcode').value = ''; } }
+    function sendManual() { 
+        let b = document.getElementById('manualBarcode').value.trim(); 
+        if(b) { 
+            handleScan(b); 
+            document.getElementById('manualBarcode').value = ''; 
+        } 
+    }
     
     function createSession() {
         currentSessionId = Math.floor(100000 + Math.random() * 900000).toString();
@@ -185,8 +329,31 @@
     }
     
     function copyData() { navigator.clipboard.writeText(`Код: ${currentSessionId}\nПароль: ${currentPassword}`); showNotification('✅ Скопировано!'); }
-    function speak(text) { if('speechSynthesis' in window) { window.speechSynthesis.cancel(); let u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; window.speechSynthesis.speak(u); } }
-    function showNotification(msg) { let n = document.createElement('div'); n.className = 'notification'; n.textContent = msg; document.body.appendChild(n); setTimeout(() => n.remove(), 2000); }
+    
+    function speak(text) { 
+        if('speechSynthesis' in window) { 
+            window.speechSynthesis.cancel(); 
+            let u = new SpeechSynthesisUtterance(text); 
+            u.lang = 'ru-RU'; 
+            window.speechSynthesis.speak(u); 
+        } 
+    }
+    
+    function showNotification(msg, type = 'success') {
+        let n = document.createElement('div');
+        n.className = 'notification';
+        if (type === 'admin') n.classList.add('admin');
+        if (type === 'error') n.classList.add('error');
+        n.textContent = msg;
+        document.body.appendChild(n);
+        setTimeout(() => n.remove(), 3000);
+    }
+    
+    function escapeHtml(text) { 
+        const div = document.createElement('div'); 
+        div.textContent = text; 
+        return div.innerHTML; 
+    }
     
     createSession();
     renderCart();
