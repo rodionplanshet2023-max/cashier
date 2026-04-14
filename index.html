@@ -37,9 +37,8 @@
         .btn-exit-admin { background: #ff9800; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
         .print-buttons { display: flex; gap: 10px; margin-top: 10px; width: 100%; display: none; }
         .print-buttons.show { display: flex; }
-        .btn-bluetooth { background: #005bff; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
-        .btn-usb { background: #17a2b8; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
         .btn-copy { background: #28a745; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
+        .btn-funprint { background: #ff9800; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
         .status { padding: 10px; margin-top: 15px; border-radius: 8px; text-align: center; font-size: 14px; }
         .status.online { background: #d4edda; color: #155724; }
         .status.offline { background: #f8d7da; color: #721c24; }
@@ -55,6 +54,9 @@
         .btn-new-purchase { background: #28a745; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
         .receipt-preview { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-top: 15px; font-family: monospace; font-size: 13px; display: none; }
         .receipt-preview.show { display: block; }
+        .qr-code { text-align: center; margin-top: 10px; }
+        .qr-container { background: white; padding: 10px; border-radius: 10px; display: inline-block; }
+        .print-instruction { font-size: 12px; color: #666; margin-top: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -115,18 +117,32 @@
         </div>
         
         <div class="print-buttons" id="printButtons">
-            <button class="btn-bluetooth" onclick="printViaBluetooth()">🔵 Bluetooth</button>
-            <button class="btn-usb" onclick="printViaUSB()">🔌 USB</button>
-            <button class="btn-copy" onclick="copyReceiptText()">📋 Копировать</button>
+            <button class="btn-copy" onclick="copyReceiptText()">📋 Копировать чек</button>
+            <button class="btn-funprint" onclick="showPrintQR()">📱 Печать в Fun Print</button>
         </div>
         
         <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
         <button class="btn-new-purchase" id="newPurchaseBtn" onclick="newPurchase()">🆕 Новая покупка</button>
         
         <div id="receiptPreview" class="receipt-preview"></div>
+        
+        <div id="qrPrintSection" style="display: none; margin-top: 15px;">
+            <div class="qr-code">
+                <div id="qrContainer" class="qr-container"></div>
+                <div class="print-instruction">
+                    📱 <strong>Инструкция для Fun Print:</strong><br>
+                    1. Открой приложение Fun Print на телефоне<br>
+                    2. Нажми "Сканировать QR"<br>
+                    3. Наведи камеру на QR код на экране ПК<br>
+                    4. Нажми "Печать"
+                </div>
+                <button onclick="copyReceiptText()" style="margin-top:10px; background:#28a745; color:white; border:none; padding:8px 15px; border-radius:6px; cursor:pointer;">📋 Или скопировать текст</button>
+            </div>
+        </div>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAQVrsSUqhrgujZ4L9UqTKdfR2AByigeD0",
@@ -154,13 +170,6 @@
     let adminBarcode = null;
     let lastReceipt = null;
     let isPaid = false;
-    
-    // Bluetooth переменные
-    let bluetoothDevice = null;
-    let bluetoothCharacteristic = null;
-    
-    // USB переменные
-    let usbDevice = null;
     
     auth.signInAnonymously().catch(console.error);
     
@@ -203,6 +212,7 @@
         const payBtn = document.getElementById('payBtn');
         const newPurchaseBtn = document.getElementById('newPurchaseBtn');
         const receiptPreview = document.getElementById('receiptPreview');
+        const qrPrintSection = document.getElementById('qrPrintSection');
         
         cartCount.innerText = currentCart.length;
         
@@ -215,6 +225,7 @@
                 newPurchaseBtn.style.display = 'block';
                 receiptPreview.innerHTML = generateReceiptHTML(lastReceipt);
                 receiptPreview.classList.add('show');
+                qrPrintSection.style.display = 'none';
             } else {
                 printButtons.classList.remove('show');
                 newPurchaseBtn.style.display = 'none';
@@ -234,6 +245,7 @@
         printButtons.classList.remove('show');
         newPurchaseBtn.style.display = 'none';
         receiptPreview.classList.remove('show');
+        qrPrintSection.style.display = 'none';
         
         let total = 0;
         cartList.innerHTML = currentCart.map((item, i) => {
@@ -361,134 +373,48 @@
         text += `ИТОГО: ${receipt.total.toFixed(2)} руб.\n`;
         text += line + '\n';
         text += 'Спасибо за покупку!\n';
-        text += '\n\n\n';
         return text;
     }
     
-    // ============ BLUETOOTH ПЕЧАТЬ ============
-    async function connectBluetoothPrinter() {
-        if (!navigator.bluetooth) {
-            showNotification('❌ Ваш браузер не поддерживает Bluetooth', 'error');
-            return false;
-        }
-        
-        try {
-            showNotification('🔵 Поиск принтера...', 'admin');
-            
-            // UUID для MX05 / Xprinter
-            const MX05_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
-            const MX05_CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
-            
-            bluetoothDevice = await navigator.bluetooth.requestDevice({
-                filters: [
-                    { namePrefix: 'MX' },
-                    { namePrefix: 'Xprinter' },
-                    { namePrefix: '58mm' },
-                    { namePrefix: 'Printer' }
-                ],
-                optionalServices: [MX05_SERVICE_UUID]
-            });
-            
-            showNotification(`🔵 Подключение к ${bluetoothDevice.name || 'принтеру'}...`, 'admin');
-            
-            const server = await bluetoothDevice.gatt.connect();
-            const service = await server.getPrimaryService(MX05_SERVICE_UUID);
-            bluetoothCharacteristic = await service.getCharacteristic(MX05_CHARACTERISTIC_UUID);
-            
-            showNotification(`✅ Принтер ${bluetoothDevice.name} готов!`, 'success');
-            speak("Принтер подключен");
-            return true;
-            
-        } catch (error) {
-            console.error('Bluetooth error:', error);
-            showNotification('❌ Ошибка: ' + error.message, 'error');
-            return false;
-        }
+    function generateShortReceiptText(receipt) {
+        let text = `ПВЗ ТЕРМИНАЛ\n`;
+        text += `${receipt.receiptId}\n`;
+        text += `${receipt.date}\n`;
+        text += `----------------\n`;
+        receipt.items.forEach((item, idx) => {
+            let name = item.name.length > 15 ? item.name.substring(0, 12) + '..' : item.name;
+            text += `${idx+1}.${name} ${Math.round(item.price)}р\n`;
+        });
+        text += `----------------\n`;
+        text += `ИТОГО: ${Math.round(receipt.total)} руб.\n`;
+        text += `Спасибо!`;
+        return text;
     }
     
-    async function printViaBluetooth() {
+    function showPrintQR() {
         if (!lastReceipt) {
             showNotification('❌ Нет чека для печати', 'error');
             return;
         }
         
-        if (!bluetoothCharacteristic) {
-            const connected = await connectBluetoothPrinter();
-            if (!connected) return;
-        }
-        
-        const receiptText = generateFullReceiptText(lastReceipt);
-        const encoder = new TextEncoder();
-        const data = encoder.encode(receiptText);
+        const shortText = generateShortReceiptText(lastReceipt);
+        const qrContainer = document.getElementById('qrContainer');
+        qrContainer.innerHTML = '';
         
         try {
-            await bluetoothCharacteristic.writeValue(data);
-            showNotification('✅ Чек отправлен на печать!', 'success');
-            speak("Чек напечатан");
-        } catch (error) {
-            console.error('Print error:', error);
-            showNotification('❌ Ошибка печати. Попробуйте ещё раз', 'error');
-            bluetoothCharacteristic = null;
-        }
-    }
-    
-    // ============ USB ПЕЧАТЬ ============
-    async function connectUSBPrinter() {
-        if (!navigator.usb) {
-            showNotification('❌ Ваш браузер не поддерживает USB', 'error');
-            return false;
-        }
-        
-        try {
-            showNotification('🔌 Поиск USB принтера...', 'admin');
-            
-            usbDevice = await navigator.usb.requestDevice({
-                filters: [
-                    { vendorId: 0x0483 },  // STMicroelectronics
-                    { vendorId: 0x1a86 },  // QinHeng
-                    { vendorId: 0x10c4 },  // Silicon Labs
-                    { vendorId: 0x0416 },  // Winbond
-                    { vendorId: 0x0403 }   // FTDI
-                ]
+            new QRCode(qrContainer, {
+                text: shortText,
+                width: 250,
+                height: 250,
+                colorDark: "#000000",
+                colorLight: "#ffffff"
             });
-            
-            await usbDevice.open();
-            await usbDevice.selectConfiguration(1);
-            await usbDevice.claimInterface(0);
-            
-            showNotification(`✅ USB принтер подключен!`, 'success');
-            speak("USB принтер подключен");
-            return true;
-        } catch (error) {
-            console.error('USB error:', error);
-            showNotification('❌ Ошибка USB: ' + error.message, 'error');
-            return false;
-        }
-    }
-    
-    async function printViaUSB() {
-        if (!lastReceipt) {
-            showNotification('❌ Нет чека для печати', 'error');
-            return;
-        }
-        
-        if (!usbDevice) {
-            const connected = await connectUSBPrinter();
-            if (!connected) return;
-        }
-        
-        const receiptText = generateFullReceiptText(lastReceipt);
-        const encoder = new TextEncoder();
-        const data = encoder.encode(receiptText);
-        
-        try {
-            await usbDevice.transferOut(1, data);
-            showNotification('✅ Чек отправлен на печать!', 'success');
-            speak("Чек напечатан");
-        } catch (error) {
-            console.error('USB print error:', error);
-            showNotification('❌ Ошибка печати. Попробуйте ещё раз', 'error');
-            usbDevice = null;
+            document.getElementById('qrPrintSection').style.display = 'block';
+            showNotification('✅ QR код готов! Отсканируйте телефоном', 'success');
+        } catch(e) {
+            showNotification('❌ Ошибка создания QR', 'error');
+            document.getElementById('qrPrintSection').style.display = 'block';
+            qrContainer.innerHTML = `<div style="padding:20px; font-family:monospace; font-size:12px;">${shortText}</div>`;
         }
     }
     
@@ -499,7 +425,7 @@
         }
         const text = generateFullReceiptText(lastReceipt);
         navigator.clipboard.writeText(text);
-        showNotification('✅ Чек скопирован!', 'success');
+        showNotification('✅ Чек скопирован! Вставьте в Fun Print', 'success');
     }
     
     function newPurchase() {
@@ -508,6 +434,8 @@
         isPaid = false;
         localStorage.removeItem('lastReceipt');
         localStorage.removeItem('currentCart');
+        document.getElementById('qrPrintSection').style.display = 'none';
+        document.getElementById('qrContainer').innerHTML = '';
         saveData();
         showNotification('🆕 Новая покупка!', 'success');
         speak("Новая покупка");
