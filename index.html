@@ -32,7 +32,7 @@
         .btn-remove.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
         .actions { display: flex; gap: 15px; margin-top: 20px; }
         .btn-pay { background: linear-gradient(90deg, #4caf50, #43a047); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-pay.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
+        .btn-pay.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; pointer-events: none; }
         .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .btn-exit-admin { background: #ff9800; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
         .btn-print { background: #17a2b8; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
@@ -48,9 +48,9 @@
         .admin-hint { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center; }
         .admin-card { background: white; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin: 10px 0; text-align: center; }
         .btn-create-admin { background: #ff9800; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .print-qr { text-align: center; margin-top: 10px; padding: 10px; background: #e8f0fe; border-radius: 8px; display: none; }
-        .print-qr.show { display: block; }
-        .new-purchase-btn { background: #28a745; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
+        .print-section { text-align: center; margin-top: 15px; padding: 15px; background: #e8f0fe; border-radius: 8px; display: none; }
+        .print-section.show { display: block; }
+        .receipt-text { font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: left; max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -83,10 +83,13 @@
             </div>
         </div>
         
-        <div id="printQR" class="print-qr">
+        <div id="printSection" class="print-section">
             <strong>🖨️ ЧЕК ДЛЯ ПЕЧАТИ</strong>
-            <div id="qrContainer" style="margin: 10px 0;"></div>
-            <button onclick="copyReceiptText()" style="background:#17a2b8; color:white; border:none; padding:8px; border-radius:6px; margin-top:5px;">📋 Скопировать текст чека</button>
+            <div id="receiptTextDisplay" class="receipt-text"></div>
+            <button onclick="copyReceiptText()" style="background:#17a2b8; color:white; border:none; padding:10px; border-radius:8px; margin-top:10px; width:100%;">📋 Копировать текст чека</button>
+            <div style="font-size: 11px; margin-top: 10px; color: #666;">
+                Вставьте текст в приложение Fun Print и напечатайте
+            </div>
         </div>
     </div>
 
@@ -116,13 +119,11 @@
             <button class="btn-pay" id="payBtn" onclick="checkout()">✅ Оплатить</button>
         </div>
         
-        <button class="btn-print" id="printBtn" onclick="printReceipt()">🖨️ Распечатать чек</button>
+        <button class="btn-print" id="printBtn" onclick="showPrintSection()">🖨️ Показать чек для печати</button>
         <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
-        <button class="new-purchase-btn" id="newPurchaseBtn" onclick="newPurchase()">🆕 Новая покупка</button>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAQVrsSUqhrgujZ4L9UqTKdfR2AByigeD0",
@@ -190,7 +191,6 @@
         const exitAdminBtn = document.getElementById('exitAdminBtn');
         const printBtn = document.getElementById('printBtn');
         const payBtn = document.getElementById('payBtn');
-        const newPurchaseBtn = document.getElementById('newPurchaseBtn');
         
         cartCount.innerText = currentCart.length;
         
@@ -200,24 +200,19 @@
             
             if (isPaid && lastReceipt) {
                 printBtn.style.display = 'block';
-                newPurchaseBtn.style.display = 'block';
             } else {
                 printBtn.style.display = 'none';
-                newPurchaseBtn.style.display = 'none';
             }
             return;
         }
         
         actions.style.display = 'flex';
         printBtn.style.display = 'none';
-        newPurchaseBtn.style.display = 'none';
         
         if (isPaid) {
             payBtn.classList.add('disabled');
-            payBtn.disabled = true;
         } else {
             payBtn.classList.remove('disabled');
-            payBtn.disabled = false;
         }
         
         let total = 0;
@@ -282,7 +277,7 @@
         }
         
         if(isPaid) {
-            showNotification('⚠️ Этот чек уже оплачен! Нажмите "Новая покупка"', 'error');
+            showNotification('⚠️ Товары уже оплачены! Начните новую покупку', 'error');
             return;
         }
         
@@ -296,71 +291,50 @@
         };
         
         speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
-        showPrintQR(lastReceipt);
-        showNotification(`✅ Оплачено ${total.toFixed(2)} руб. Чек готов к печати`, 'success');
+        showNotification(`✅ Оплачено ${total.toFixed(2)} руб.`, 'success');
         
+        // Очищаем корзину и ставим флаг оплаты
         currentCart = [];
         isPaid = true;
         saveData();
-    }
-    
-    function newPurchase() {
-        currentCart = [];
-        lastReceipt = null;
-        isPaid = false;
-        document.getElementById('printQR').classList.remove('show');
-        document.getElementById('qrContainer').innerHTML = '';
-        saveData();
-        showNotification('🆕 Новая покупка! Можете сканировать товары', 'success');
-        speak("Новая покупка");
+        
+        // Показываем кнопку печати
+        document.getElementById('printBtn').style.display = 'block';
     }
     
     function generateReceiptText(receipt) {
-        const line = '═══════════════════════════════════';
-        const smallLine = '───────────────────────────────';
+        const line = '═══════════════════════════';
         
         let text = '';
         text += line + '\n';
-        text += '         🏪 ПВЗ ТЕРМИНАЛ\n';
+        text += '      ПВЗ ТЕРМИНАЛ\n';
         text += line + '\n';
-        text += `Дата: ${receipt.date}\n`;
+        text += `${receipt.date}\n`;
         text += `${receipt.receiptId}\n`;
-        text += smallLine + '\n';
-        text += 'Товары:\n';
-        text += smallLine + '\n';
+        text += '───────────────────────────\n';
         
         receipt.items.forEach((item, idx) => {
             text += `${idx+1}. ${item.name}\n`;
-            text += `   ${item.code}\n`;
             text += `   ${item.price.toFixed(2)} руб.\n`;
-            text += smallLine + '\n';
         });
         
-        text += line + '\n';
+        text += '───────────────────────────\n';
         text += `ИТОГО: ${receipt.total.toFixed(2)} руб.\n`;
         text += line + '\n';
         text += 'Спасибо за покупку!\n';
-        text += 'Приходите еще!\n';
-        text += line + '\n';
         
         return text;
     }
     
-    function showPrintQR(receipt) {
-        const receiptText = generateReceiptText(receipt);
-        const qrContainer = document.getElementById('qrContainer');
-        qrContainer.innerHTML = '';
+    function showPrintSection() {
+        if (!lastReceipt) {
+            showNotification('❌ Нет чека для печати. Сначала оплатите товары', 'error');
+            return;
+        }
         
-        new QRCode(qrContainer, {
-            text: receiptText,
-            width: 200,
-            height: 200,
-            colorDark: "#000000",
-            colorLight: "#ffffff"
-        });
-        
-        const printQRDiv = document.getElementById('printQR');
-        printQRDiv.classList.add('show');
+        const receiptText = generateReceiptText(lastReceipt);
+        document.getElementById('receiptTextDisplay').innerText = receiptText;
+        document.getElementById('printSection').classList.add('show');
     }
     
     function copyReceiptText() {
@@ -371,14 +345,6 @@
         } else {
             showNotification('❌ Нет чека для копирования', 'error');
         }
-    }
-    
-    function printReceipt() {
-        if (!lastReceipt) {
-            showNotification('❌ Нет чека для печати. Сначала оплатите товары', 'error');
-            return;
-        }
-        showPrintQR(lastReceipt);
     }
     
     function enableAdminMode() {
@@ -409,7 +375,7 @@
         console.log('Сканировано:', barcode);
         
         if (isPaid) {
-            showNotification('⚠️ Оплата уже произведена! Нажмите "Новая покупка"', 'error');
+            showNotification('⚠️ Товары уже оплачены! Начните новую покупку', 'error');
             return;
         }
         
