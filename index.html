@@ -50,7 +50,7 @@
         .btn-create-admin { background: #ff9800; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .print-section { text-align: center; margin-top: 15px; padding: 15px; background: #e8f0fe; border-radius: 8px; display: none; }
         .print-section.show { display: block; }
-        .receipt-text { font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: left; max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+        .receipt-text { font-family: monospace; font-size: 12px; background: white; padding: 15px; border-radius: 8px; margin-top: 10px; text-align: left; white-space: pre-wrap; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -119,7 +119,7 @@
             <button class="btn-pay" id="payBtn" onclick="checkout()">✅ Оплатить</button>
         </div>
         
-        <button class="btn-print" id="printBtn" onclick="showPrintSection()">🖨️ Показать чек для печати</button>
+        <button class="btn-print" id="printBtn" onclick="showPrintSection()">🖨️ Распечатать чек</button>
         <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
     </div>
 </div>
@@ -207,12 +207,13 @@
         }
         
         actions.style.display = 'flex';
-        printBtn.style.display = 'none';
         
         if (isPaid) {
             payBtn.classList.add('disabled');
+            printBtn.style.display = 'block';
         } else {
             payBtn.classList.remove('disabled');
+            printBtn.style.display = 'none';
         }
         
         let total = 0;
@@ -283,12 +284,16 @@
         
         let total = currentCart.reduce((s,i)=>s+i.price,0);
         
+        // Сохраняем чек
         lastReceipt = {
             items: [...currentCart],
             total: total,
             date: new Date().toLocaleString(),
             receiptId: 'ЧЕК №' + Math.floor(Math.random() * 10000)
         };
+        
+        // Сохраняем в localStorage чтобы не потерять
+        localStorage.setItem('lastReceipt', JSON.stringify(lastReceipt));
         
         speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
         showNotification(`✅ Оплачено ${total.toFixed(2)} руб.`, 'success');
@@ -298,11 +303,15 @@
         isPaid = true;
         saveData();
         
-        // Показываем кнопку печати
-        document.getElementById('printBtn').style.display = 'block';
+        // Автоматически показываем чек
+        setTimeout(() => {
+            showPrintSection();
+        }, 500);
     }
     
     function generateReceiptText(receipt) {
+        if (!receipt) return "Нет чека для печати";
+        
         const line = '═══════════════════════════';
         
         let text = '';
@@ -327,19 +336,44 @@
     }
     
     function showPrintSection() {
-        if (!lastReceipt) {
+        // Пробуем загрузить чек из памяти или из localStorage
+        let receipt = lastReceipt;
+        
+        if (!receipt) {
+            const saved = localStorage.getItem('lastReceipt');
+            if (saved) {
+                receipt = JSON.parse(saved);
+                lastReceipt = receipt;
+            }
+        }
+        
+        if (!receipt) {
             showNotification('❌ Нет чека для печати. Сначала оплатите товары', 'error');
             return;
         }
         
-        const receiptText = generateReceiptText(lastReceipt);
-        document.getElementById('receiptTextDisplay').innerText = receiptText;
-        document.getElementById('printSection').classList.add('show');
+        const receiptText = generateReceiptText(receipt);
+        const textDiv = document.getElementById('receiptTextDisplay');
+        textDiv.innerText = receiptText;
+        
+        const printSection = document.getElementById('printSection');
+        printSection.classList.add('show');
+        
+        showNotification('📄 Чек готов к печати!', 'success');
     }
     
     function copyReceiptText() {
-        if (lastReceipt) {
-            const text = generateReceiptText(lastReceipt);
+        let receipt = lastReceipt;
+        if (!receipt) {
+            const saved = localStorage.getItem('lastReceipt');
+            if (saved) {
+                receipt = JSON.parse(saved);
+                lastReceipt = receipt;
+            }
+        }
+        
+        if (receipt) {
+            const text = generateReceiptText(receipt);
             navigator.clipboard.writeText(text);
             showNotification('✅ Текст чека скопирован! Вставьте в Fun Print', 'success');
         } else {
@@ -469,6 +503,16 @@
         const div = document.createElement('div'); 
         div.textContent = text; 
         return div.innerHTML; 
+    }
+    
+    // Восстанавливаем чек из localStorage при загрузке
+    const savedReceipt = localStorage.getItem('lastReceipt');
+    if (savedReceipt) {
+        lastReceipt = JSON.parse(savedReceipt);
+        const savedCart = localStorage.getItem('currentCart');
+        if (savedCart && JSON.parse(savedCart).length === 0) {
+            isPaid = true;
+        }
     }
     
     createSession();
