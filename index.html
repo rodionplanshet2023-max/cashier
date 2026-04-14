@@ -7,7 +7,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
@@ -36,7 +35,7 @@
         .btn-pay.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; pointer-events: none; }
         .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .btn-exit-admin { background: #ff9800; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
-        .btn-print { background: #17a2b8; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
+        .btn-bluetooth { background: #005bff; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
         .status { padding: 10px; margin-top: 15px; border-radius: 8px; text-align: center; font-size: 14px; }
         .status.online { background: #d4edda; color: #155724; }
         .status.offline { background: #f8d7da; color: #721c24; }
@@ -49,12 +48,10 @@
         .admin-hint { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center; }
         .admin-card { background: white; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin: 10px 0; text-align: center; }
         .btn-create-admin { background: #ff9800; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .print-section { text-align: center; margin-top: 15px; padding: 15px; background: #e8f0fe; border-radius: 12px; display: none; }
-        .print-section.show { display: block; }
-        .qr-container { background: white; padding: 15px; border-radius: 12px; display: inline-block; margin: 10px auto; }
-        .print-instruction { font-size: 12px; color: #666; margin-top: 10px; }
         .btn-new-purchase { background: #28a745; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
-        .receipt-short { font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: left; max-height: 150px; overflow-y: auto; display: none; }
+        .receipt-preview { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-top: 15px; font-family: monospace; font-size: 13px; display: none; }
+        .receipt-preview.show { display: block; }
+        .btn-copy { background: #17a2b8; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
     </style>
 </head>
 <body>
@@ -86,18 +83,6 @@
                 <button class="btn-create-admin" onclick="createAdminBarcode()">🆕 Создать админ штрихкод</button>
             </div>
         </div>
-        
-        <div id="printSection" class="print-section">
-            <strong>🖨️ СКАНИРУЙТЕ QR КОД ТЕЛЕФОНОМ</strong>
-            <div id="qrContainer" class="qr-container"></div>
-            <div class="print-instruction">
-                📱 1. Откройте приложение Fun Print<br>
-                📷 2. Нажмите "Сканировать QR"<br>
-                🖨️ 3. Наведите камеру на QR код<br>
-                ✅ 4. Нажмите "Печать"
-            </div>
-            <button onclick="copyReceiptText()" style="background:#667eea; color:white; border:none; padding:10px; border-radius:8px; margin-top:10px; width:100%;">📋 Скопировать чек</button>
-        </div>
     </div>
 
     <div class="card">
@@ -126,9 +111,12 @@
             <button class="btn-pay" id="payBtn" onclick="checkout()">✅ Оплатить</button>
         </div>
         
-        <button class="btn-print" id="printBtn" onclick="showPrintSection()">🖨️ Показать QR для печати</button>
+        <button class="btn-bluetooth" id="bluetoothBtn" onclick="printViaBluetooth()">🔵 Печать по Bluetooth</button>
+        <button class="btn-copy" id="copyBtn" onclick="copyReceiptText()">📋 Копировать чек</button>
         <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
         <button class="btn-new-purchase" id="newPurchaseBtn" onclick="newPurchase()">🆕 Новая покупка</button>
+        
+        <div id="receiptPreview" class="receipt-preview"></div>
     </div>
 </div>
 
@@ -159,6 +147,9 @@
     let adminBarcode = null;
     let lastReceipt = null;
     let isPaid = false;
+    
+    let bluetoothDevice = null;
+    let bluetoothCharacteristic = null;
     
     auth.signInAnonymously().catch(console.error);
     
@@ -197,9 +188,11 @@
         const cartCount = document.getElementById('cartCount');
         const actions = document.getElementById('cartActions');
         const exitAdminBtn = document.getElementById('exitAdminBtn');
-        const printBtn = document.getElementById('printBtn');
+        const bluetoothBtn = document.getElementById('bluetoothBtn');
+        const copyBtn = document.getElementById('copyBtn');
         const payBtn = document.getElementById('payBtn');
         const newPurchaseBtn = document.getElementById('newPurchaseBtn');
+        const receiptPreview = document.getElementById('receiptPreview');
         
         cartCount.innerText = currentCart.length;
         
@@ -208,11 +201,16 @@
             actions.style.display = 'none';
             
             if (isPaid && lastReceipt) {
-                printBtn.style.display = 'block';
+                bluetoothBtn.style.display = 'block';
+                copyBtn.style.display = 'block';
                 newPurchaseBtn.style.display = 'block';
+                receiptPreview.innerHTML = generateReceiptHTML(lastReceipt);
+                receiptPreview.classList.add('show');
             } else {
-                printBtn.style.display = 'none';
+                bluetoothBtn.style.display = 'none';
+                copyBtn.style.display = 'none';
                 newPurchaseBtn.style.display = 'none';
+                receiptPreview.classList.remove('show');
             }
             return;
         }
@@ -221,13 +219,14 @@
         
         if (isPaid) {
             payBtn.classList.add('disabled');
-            printBtn.style.display = 'none';
-            newPurchaseBtn.style.display = 'block';
         } else {
             payBtn.classList.remove('disabled');
-            printBtn.style.display = 'none';
-            newPurchaseBtn.style.display = 'none';
         }
+        
+        bluetoothBtn.style.display = 'none';
+        copyBtn.style.display = 'none';
+        newPurchaseBtn.style.display = 'none';
+        receiptPreview.classList.remove('show');
         
         let total = 0;
         cartList.innerHTML = currentCart.map((item, i) => {
@@ -254,6 +253,30 @@
         } else {
             exitAdminBtn.style.display = 'none';
         }
+    }
+    
+    function generateReceiptHTML(receipt) {
+        return `
+            <div style="font-family: monospace; font-size: 13px; text-align: center;">
+                <div style="font-weight: bold;">🏪 ПВЗ ТЕРМИНАЛ</div>
+                <div style="font-size: 10px; color: #666;">${receipt.date}</div>
+                <div style="font-size: 10px; color: #666;">${receipt.receiptId}</div>
+                <div style="border-top: 1px dashed #ccc; margin: 8px 0;"></div>
+                ${receipt.items.map((item, idx) => `
+                    <div style="display: flex; justify-content: space-between; margin: 4px 0;">
+                        <span>${idx+1}. ${item.name}</span>
+                        <span>${item.price.toFixed(2)} руб.</span>
+                    </div>
+                `).join('')}
+                <div style="border-top: 1px dashed #ccc; margin: 8px 0;"></div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                    <span>ИТОГО:</span>
+                    <span>${receipt.total.toFixed(2)} руб.</span>
+                </div>
+                <div style="border-top: 1px dashed #ccc; margin: 8px 0;"></div>
+                <div style="font-size: 11px;">Спасибо за покупку!</div>
+            </div>
+        `;
     }
     
     function showAdminRequired() {
@@ -312,36 +335,10 @@
         currentCart = [];
         isPaid = true;
         saveData();
-        
-        setTimeout(() => {
-            showPrintSection();
-        }, 500);
     }
     
-    // СУПЕР-КОРОТКИЙ ЧЕК ДЛЯ QR (максимум 200 символов)
-    function generateMiniReceiptText(receipt) {
-        let items = receipt.items.map((item, idx) => {
-            let name = item.name.length > 12 ? item.name.substring(0, 10) + '.' : item.name;
-            return `${idx+1}.${name} ${Math.round(item.price)}р`;
-        }).join(' ');
-        
-        let total = Math.round(receipt.total);
-        
-        // Формат: "ПВЗ|{id}|{total}|{items}"
-        let text = `ПВЗ|${receipt.receiptId.slice(-4)}|${total}|${items}`;
-        
-        // Если всё ещё длинный - обрезаем
-        if (text.length > 250) {
-            text = `ПВЗ|${receipt.receiptId.slice(-4)}|${total}|${receipt.items.length}тов`;
-        }
-        
-        return text;
-    }
-    
-    // ПОЛНЫЙ ЧЕК ДЛЯ КОПИРОВАНИЯ
     function generateFullReceiptText(receipt) {
         const line = '═══════════════════════════';
-        
         let text = '';
         text += line + '\n';
         text += '      ПВЗ ТЕРМИНАЛ\n';
@@ -349,83 +346,90 @@
         text += `${receipt.date}\n`;
         text += `${receipt.receiptId}\n`;
         text += '───────────────────────────\n';
-        
         receipt.items.forEach((item, idx) => {
             text += `${idx+1}. ${item.name}\n`;
             text += `   ${item.price.toFixed(2)} руб.\n`;
         });
-        
         text += '───────────────────────────\n';
         text += `ИТОГО: ${receipt.total.toFixed(2)} руб.\n`;
         text += line + '\n';
         text += 'Спасибо за покупку!\n';
-        
         return text;
     }
     
-    function showPrintSection() {
-        let receipt = lastReceipt;
-        
-        if (!receipt) {
-            const saved = localStorage.getItem('lastReceipt');
-            if (saved) {
-                receipt = JSON.parse(saved);
-                lastReceipt = receipt;
-            }
+    async function connectBluetoothPrinter() {
+        if (!navigator.bluetooth) {
+            showNotification('❌ Ваш браузер не поддерживает Bluetooth', 'error');
+            return false;
         }
         
-        if (!receipt) {
-            showNotification('❌ Нет чека для печати. Сначала оплатите товары', 'error');
+        try {
+            showNotification('🔵 Поиск Bluetooth принтеров...', 'admin');
+            
+            bluetoothDevice = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['00001801-0000-1000-8000-00805f9b34fb']
+            });
+            
+            showNotification('🔵 Подключение...', 'admin');
+            
+            const server = await bluetoothDevice.gatt.connect();
+            const services = await server.getPrimaryServices();
+            
+            for (const service of services) {
+                const characteristics = await service.getCharacteristics();
+                for (const char of characteristics) {
+                    if (char.properties.write || char.properties.writeWithoutResponse) {
+                        bluetoothCharacteristic = char;
+                        showNotification('✅ Принтер готов!', 'success');
+                        speak("Принтер подключен");
+                        return true;
+                    }
+                }
+            }
+            
+            showNotification('⚠️ Принтер подключен', 'admin');
+            return true;
+        } catch (error) {
+            console.error('Bluetooth error:', error);
+            showNotification('❌ Ошибка: ' + error.message, 'error');
+            return false;
+        }
+    }
+    
+    async function printViaBluetooth() {
+        if (!lastReceipt) {
+            showNotification('❌ Нет чека для печати', 'error');
             return;
         }
         
-        // Мини-чек для QR
-        const miniReceiptText = generateMiniReceiptText(receipt);
-        
-        console.log('Длина текста для QR:', miniReceiptText.length, 'символов');
-        console.log('Текст:', miniReceiptText);
-        
-        // Создаем QR код
-        const qrContainer = document.getElementById('qrContainer');
-        qrContainer.innerHTML = '';
-        
-        try {
-            new QRCode(qrContainer, {
-                text: miniReceiptText,
-                width: 250,
-                height: 250,
-                colorDark: "#000000",
-                colorLight: "#ffffff"
-            });
-            showNotification('✅ QR код создан! Отсканируйте телефоном', 'success');
-        } catch(e) {
-            console.error('QR error:', e);
-            // Если не получилось - показываем простой текст
-            qrContainer.innerHTML = `<div style="padding:20px; font-family:monospace; word-break:break-all;">${miniReceiptText}</div>`;
-            showNotification('⚠️ QR не создан, но текст чека на экране', 'admin');
+        if (!bluetoothCharacteristic) {
+            const connected = await connectBluetoothPrinter();
+            if (!connected) return;
         }
         
-        const printSection = document.getElementById('printSection');
-        printSection.classList.add('show');
+        const receiptText = generateFullReceiptText(lastReceipt);
+        const encoder = new TextEncoder();
+        const data = encoder.encode(receiptText + '\n\n\n');
+        
+        try {
+            await bluetoothCharacteristic.writeValue(data);
+            showNotification('✅ Чек отправлен на печать!', 'success');
+            speak("Чек напечатан");
+        } catch (error) {
+            showNotification('❌ Ошибка печати', 'error');
+            bluetoothCharacteristic = null;
+        }
     }
     
     function copyReceiptText() {
-        let receipt = lastReceipt;
-        if (!receipt) {
-            const saved = localStorage.getItem('lastReceipt');
-            if (saved) {
-                receipt = JSON.parse(saved);
-                lastReceipt = receipt;
-            }
+        if (!lastReceipt) {
+            showNotification('❌ Нет чека', 'error');
+            return;
         }
-        
-        if (receipt) {
-            const text = generateFullReceiptText(receipt);
-            navigator.clipboard.writeText(text);
-            showNotification('✅ Полный текст чека скопирован!', 'success');
-        } else {
-            showNotification('❌ Нет чека для копирования', 'error');
-        }
+        const text = generateFullReceiptText(lastReceipt);
+        navigator.clipboard.writeText(text);
+        showNotification('✅ Чек скопирован!', 'success');
     }
     
     function newPurchase() {
@@ -434,10 +438,8 @@
         isPaid = false;
         localStorage.removeItem('lastReceipt');
         localStorage.removeItem('currentCart');
-        document.getElementById('printSection').classList.remove('show');
-        document.getElementById('qrContainer').innerHTML = '';
         saveData();
-        showNotification('🆕 Новая покупка! Можете сканировать товары', 'success');
+        showNotification('🆕 Новая покупка!', 'success');
         speak("Новая покупка");
     }
     
@@ -469,7 +471,7 @@
         console.log('Сканировано:', barcode);
         
         if (isPaid) {
-            showNotification('⚠️ Товары уже оплачены! Нажмите "Новая покупка"', 'error');
+            showNotification('⚠️ Оплачено! Нажмите "Новая покупка"', 'error');
             return;
         }
         
