@@ -32,6 +32,7 @@
         .btn-remove.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
         .actions { display: flex; gap: 15px; margin-top: 20px; }
         .btn-pay { background: linear-gradient(90deg, #4caf50, #43a047); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-pay.disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
         .btn-return { background: linear-gradient(90deg, #f44336, #e53935); color: white; flex: 1; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .btn-exit-admin { background: #ff9800; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
         .btn-print { background: #17a2b8; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
@@ -49,6 +50,7 @@
         .btn-create-admin { background: #ff9800; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .print-qr { text-align: center; margin-top: 10px; padding: 10px; background: #e8f0fe; border-radius: 8px; display: none; }
         .print-qr.show { display: block; }
+        .new-purchase-btn { background: #28a745; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
     </style>
 </head>
 <body>
@@ -81,11 +83,10 @@
             </div>
         </div>
         
-        <!-- QR для печати через телефон -->
         <div id="printQR" class="print-qr">
-            <strong>🖨️ Для печати чека:</strong><br>
+            <strong>🖨️ ЧЕК ДЛЯ ПЕЧАТИ</strong>
             <div id="qrContainer" style="margin: 10px 0;"></div>
-            <small>Отсканируйте QR код камерой телефона и отправьте на принтер Fun Print</small>
+            <button onclick="copyReceiptText()" style="background:#17a2b8; color:white; border:none; padding:8px; border-radius:6px; margin-top:5px;">📋 Скопировать текст чека</button>
         </div>
     </div>
 
@@ -109,18 +110,20 @@
         </div>
         
         <div id="cartList" class="cart-list"><p style="color:#999; text-align:center;">Сканируйте товары</p></div>
+        
         <div class="actions" id="cartActions" style="display:none;">
             <button class="btn-return" onclick="clearCart()">❌ Очистить</button>
-            <button class="btn-pay" onclick="checkout()">✅ Оплатить</button>
+            <button class="btn-pay" id="payBtn" onclick="checkout()">✅ Оплатить</button>
         </div>
+        
         <button class="btn-print" id="printBtn" onclick="printReceipt()">🖨️ Распечатать чек</button>
         <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
+        <button class="new-purchase-btn" id="newPurchaseBtn" onclick="newPurchase()">🆕 Новая покупка</button>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
-    // ============ ВСТАВЬ СВОЙ FIREBASE КОНФИГ СЮДА ============
     const firebaseConfig = {
       apiKey: "AIzaSyAQVrsSUqhrgujZ4L9UqTKdfR2AByigeD0",
       authDomain: "cashier-terminal.firebaseapp.com",
@@ -129,7 +132,6 @@
       messagingSenderId: "152891465999",
       appId: "1:152891465999:web:f3e58d7f63b31d37371e7a"
     };
-    // ====================================================
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -147,6 +149,7 @@
     let isAdminMode = false;
     let adminBarcode = null;
     let lastReceipt = null;
+    let isPaid = false;
     
     auth.signInAnonymously().catch(console.error);
     
@@ -186,18 +189,36 @@
         const actions = document.getElementById('cartActions');
         const exitAdminBtn = document.getElementById('exitAdminBtn');
         const printBtn = document.getElementById('printBtn');
+        const payBtn = document.getElementById('payBtn');
+        const newPurchaseBtn = document.getElementById('newPurchaseBtn');
         
         cartCount.innerText = currentCart.length;
         
         if (currentCart.length === 0) {
             cartList.innerHTML = '<p style="color:#999; text-align:center;">Сканируйте товары</p>';
             actions.style.display = 'none';
-            printBtn.style.display = 'none';
+            
+            if (isPaid && lastReceipt) {
+                printBtn.style.display = 'block';
+                newPurchaseBtn.style.display = 'block';
+            } else {
+                printBtn.style.display = 'none';
+                newPurchaseBtn.style.display = 'none';
+            }
             return;
         }
         
         actions.style.display = 'flex';
-        printBtn.style.display = 'block';
+        printBtn.style.display = 'none';
+        newPurchaseBtn.style.display = 'none';
+        
+        if (isPaid) {
+            payBtn.classList.add('disabled');
+            payBtn.disabled = true;
+        } else {
+            payBtn.classList.remove('disabled');
+            payBtn.disabled = false;
+        }
         
         let total = 0;
         cartList.innerHTML = currentCart.map((item, i) => {
@@ -255,10 +276,18 @@
     }
     
     function checkout() {
-        if(currentCart.length===0) return;
+        if(currentCart.length === 0) {
+            showNotification('❌ Корзина пуста!', 'error');
+            return;
+        }
+        
+        if(isPaid) {
+            showNotification('⚠️ Этот чек уже оплачен! Нажмите "Новая покупка"', 'error');
+            return;
+        }
+        
         let total = currentCart.reduce((s,i)=>s+i.price,0);
         
-        // Сохраняем чек для печати
         lastReceipt = {
             items: [...currentCart],
             total: total,
@@ -267,14 +296,23 @@
         };
         
         speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
-        
-        // Показываем QR для печати
         showPrintQR(lastReceipt);
-        
         showNotification(`✅ Оплачено ${total.toFixed(2)} руб. Чек готов к печати`, 'success');
         
         currentCart = [];
+        isPaid = true;
         saveData();
+    }
+    
+    function newPurchase() {
+        currentCart = [];
+        lastReceipt = null;
+        isPaid = false;
+        document.getElementById('printQR').classList.remove('show');
+        document.getElementById('qrContainer').innerHTML = '';
+        saveData();
+        showNotification('🆕 Новая покупка! Можете сканировать товары', 'success');
+        speak("Новая покупка");
     }
     
     function generateReceiptText(receipt) {
@@ -310,13 +348,8 @@
     
     function showPrintQR(receipt) {
         const receiptText = generateReceiptText(receipt);
-        const encodedText = encodeURIComponent(receiptText);
-        // Создаем QR код с текстом чека
         const qrContainer = document.getElementById('qrContainer');
         qrContainer.innerHTML = '';
-        
-        // URL для печати через Fun Print (текст для копирования)
-        const printUrl = `funprint://print?text=${encodedText}`;
         
         new QRCode(qrContainer, {
             text: receiptText,
@@ -328,26 +361,6 @@
         
         const printQRDiv = document.getElementById('printQR');
         printQRDiv.classList.add('show');
-        
-        // Добавляем инструкцию
-        const instruction = document.createElement('div');
-        instruction.style.marginTop = '10px';
-        instruction.style.fontSize = '12px';
-        instruction.innerHTML = `
-            <strong>📱 Инструкция:</strong><br>
-            1. Открой приложение Fun Print<br>
-            2. Нажми "Сканировать QR"<br>
-            3. Наведи на QR код<br>
-            4. Нажми "Печать"
-            <br><br>
-            <button onclick="copyReceiptText()" style="background:#17a2b8; margin-top:5px;">📋 Скопировать текст чека</button>
-        `;
-        qrContainer.appendChild(instruction);
-        
-        // Скрываем через 30 секунд
-        setTimeout(() => {
-            printQRDiv.classList.remove('show');
-        }, 30000);
     }
     
     function copyReceiptText() {
@@ -355,23 +368,17 @@
             const text = generateReceiptText(lastReceipt);
             navigator.clipboard.writeText(text);
             showNotification('✅ Текст чека скопирован! Вставьте в Fun Print', 'success');
+        } else {
+            showNotification('❌ Нет чека для копирования', 'error');
         }
     }
     
     function printReceipt() {
-        if (!lastReceipt && currentCart.length === 0) {
+        if (!lastReceipt) {
             showNotification('❌ Нет чека для печати. Сначала оплатите товары', 'error');
             return;
         }
-        
-        if (currentCart.length > 0) {
-            showNotification('⚠️ Сначала оплатите товары, затем печатайте чек', 'error');
-            return;
-        }
-        
-        if (lastReceipt) {
-            showPrintQR(lastReceipt);
-        }
+        showPrintQR(lastReceipt);
     }
     
     function enableAdminMode() {
@@ -400,6 +407,11 @@
     
     function handleScan(barcode) {
         console.log('Сканировано:', barcode);
+        
+        if (isPaid) {
+            showNotification('⚠️ Оплата уже произведена! Нажмите "Новая покупка"', 'error');
+            return;
+        }
         
         let product = productDB[barcode];
         
