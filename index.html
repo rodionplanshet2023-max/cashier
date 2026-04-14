@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
@@ -48,9 +49,11 @@
         .admin-hint { background: #e8f0fe; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center; }
         .admin-card { background: white; border: 2px solid #ff9800; padding: 15px; border-radius: 12px; margin: 10px 0; text-align: center; }
         .btn-create-admin { background: #ff9800; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .print-section { text-align: center; margin-top: 15px; padding: 15px; background: #e8f0fe; border-radius: 8px; display: none; }
+        .print-section { text-align: center; margin-top: 15px; padding: 15px; background: #e8f0fe; border-radius: 12px; display: none; }
         .print-section.show { display: block; }
-        .receipt-text { font-family: monospace; font-size: 12px; background: white; padding: 15px; border-radius: 8px; margin-top: 10px; text-align: left; white-space: pre-wrap; word-break: break-all; }
+        .qr-container { background: white; padding: 15px; border-radius: 12px; display: inline-block; margin: 10px auto; }
+        .print-instruction { font-size: 12px; color: #666; margin-top: 10px; }
+        .btn-new-purchase { background: #28a745; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; display: none; }
     </style>
 </head>
 <body>
@@ -84,12 +87,15 @@
         </div>
         
         <div id="printSection" class="print-section">
-            <strong>🖨️ ЧЕК ДЛЯ ПЕЧАТИ</strong>
-            <div id="receiptTextDisplay" class="receipt-text"></div>
-            <button onclick="copyReceiptText()" style="background:#17a2b8; color:white; border:none; padding:10px; border-radius:8px; margin-top:10px; width:100%;">📋 Копировать текст чека</button>
-            <div style="font-size: 11px; margin-top: 10px; color: #666;">
-                Вставьте текст в приложение Fun Print и напечатайте
+            <strong>🖨️ СКАНИРУЙТЕ QR КОД ТЕЛЕФОНОМ</strong>
+            <div id="qrContainer" class="qr-container"></div>
+            <div class="print-instruction">
+                📱 1. Откройте приложение Fun Print<br>
+                📷 2. Нажмите "Сканировать QR"<br>
+                🖨️ 3. Наведите камеру на QR код<br>
+                ✅ 4. Нажмите "Печать"
             </div>
+            <button onclick="copyReceiptText()" style="background:#667eea; color:white; border:none; padding:10px; border-radius:8px; margin-top:10px; width:100%;">📋 Или скопировать текст</button>
         </div>
     </div>
 
@@ -119,8 +125,9 @@
             <button class="btn-pay" id="payBtn" onclick="checkout()">✅ Оплатить</button>
         </div>
         
-        <button class="btn-print" id="printBtn" onclick="showPrintSection()">🖨️ Распечатать чек</button>
+        <button class="btn-print" id="printBtn" onclick="showPrintSection()">🖨️ Показать QR для печати</button>
         <button class="btn-exit-admin" id="exitAdminBtn" onclick="exitAdminMode()">🚪 Выйти из админ режима</button>
+        <button class="btn-new-purchase" id="newPurchaseBtn" onclick="newPurchase()">🆕 Новая покупка</button>
     </div>
 </div>
 
@@ -191,6 +198,7 @@
         const exitAdminBtn = document.getElementById('exitAdminBtn');
         const printBtn = document.getElementById('printBtn');
         const payBtn = document.getElementById('payBtn');
+        const newPurchaseBtn = document.getElementById('newPurchaseBtn');
         
         cartCount.innerText = currentCart.length;
         
@@ -200,8 +208,10 @@
             
             if (isPaid && lastReceipt) {
                 printBtn.style.display = 'block';
+                newPurchaseBtn.style.display = 'block';
             } else {
                 printBtn.style.display = 'none';
+                newPurchaseBtn.style.display = 'none';
             }
             return;
         }
@@ -210,10 +220,12 @@
         
         if (isPaid) {
             payBtn.classList.add('disabled');
-            printBtn.style.display = 'block';
+            printBtn.style.display = 'none';
+            newPurchaseBtn.style.display = 'block';
         } else {
             payBtn.classList.remove('disabled');
             printBtn.style.display = 'none';
+            newPurchaseBtn.style.display = 'none';
         }
         
         let total = 0;
@@ -278,13 +290,12 @@
         }
         
         if(isPaid) {
-            showNotification('⚠️ Товары уже оплачены! Начните новую покупку', 'error');
+            showNotification('⚠️ Товары уже оплачены! Нажмите "Новая покупка"', 'error');
             return;
         }
         
         let total = currentCart.reduce((s,i)=>s+i.price,0);
         
-        // Сохраняем чек
         lastReceipt = {
             items: [...currentCart],
             total: total,
@@ -292,18 +303,15 @@
             receiptId: 'ЧЕК №' + Math.floor(Math.random() * 10000)
         };
         
-        // Сохраняем в localStorage чтобы не потерять
         localStorage.setItem('lastReceipt', JSON.stringify(lastReceipt));
         
         speak(`Оплачено ${total.toFixed(2)} рублей. Спасибо!`);
         showNotification(`✅ Оплачено ${total.toFixed(2)} руб.`, 'success');
         
-        // Очищаем корзину и ставим флаг оплаты
         currentCart = [];
         isPaid = true;
         saveData();
         
-        // Автоматически показываем чек
         setTimeout(() => {
             showPrintSection();
         }, 500);
@@ -336,7 +344,6 @@
     }
     
     function showPrintSection() {
-        // Пробуем загрузить чек из памяти или из localStorage
         let receipt = lastReceipt;
         
         if (!receipt) {
@@ -353,13 +360,28 @@
         }
         
         const receiptText = generateReceiptText(receipt);
-        const textDiv = document.getElementById('receiptTextDisplay');
-        textDiv.innerText = receiptText;
+        
+        // Создаем QR код с текстом чека
+        const qrContainer = document.getElementById('qrContainer');
+        qrContainer.innerHTML = '';
+        
+        try {
+            new QRCode(qrContainer, {
+                text: receiptText,
+                width: 250,
+                height: 250,
+                colorDark: "#000000",
+                colorLight: "#ffffff"
+            });
+        } catch(e) {
+            console.error('QR error:', e);
+            qrContainer.innerHTML = '<div style="padding:20px; color:red;">⚠️ Чек слишком длинный для QR кода</div>';
+        }
         
         const printSection = document.getElementById('printSection');
         printSection.classList.add('show');
         
-        showNotification('📄 Чек готов к печати!', 'success');
+        showNotification('📱 QR код готов! Отсканируйте телефоном', 'success');
     }
     
     function copyReceiptText() {
@@ -375,10 +397,23 @@
         if (receipt) {
             const text = generateReceiptText(receipt);
             navigator.clipboard.writeText(text);
-            showNotification('✅ Текст чека скопирован! Вставьте в Fun Print', 'success');
+            showNotification('✅ Текст чека скопирован!', 'success');
         } else {
             showNotification('❌ Нет чека для копирования', 'error');
         }
+    }
+    
+    function newPurchase() {
+        currentCart = [];
+        lastReceipt = null;
+        isPaid = false;
+        localStorage.removeItem('lastReceipt');
+        localStorage.removeItem('currentCart');
+        document.getElementById('printSection').classList.remove('show');
+        document.getElementById('qrContainer').innerHTML = '';
+        saveData();
+        showNotification('🆕 Новая покупка! Можете сканировать товары', 'success');
+        speak("Новая покупка");
     }
     
     function enableAdminMode() {
@@ -409,7 +444,7 @@
         console.log('Сканировано:', barcode);
         
         if (isPaid) {
-            showNotification('⚠️ Товары уже оплачены! Начните новую покупку', 'error');
+            showNotification('⚠️ Товары уже оплачены! Нажмите "Новая покупка"', 'error');
             return;
         }
         
@@ -505,7 +540,6 @@
         return div.innerHTML; 
     }
     
-    // Восстанавливаем чек из localStorage при загрузке
     const savedReceipt = localStorage.getItem('lastReceipt');
     if (savedReceipt) {
         lastReceipt = JSON.parse(savedReceipt);
