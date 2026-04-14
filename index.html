@@ -90,14 +90,13 @@
         <div id="printSection" class="print-section">
             <strong>🖨️ СКАНИРУЙТЕ QR КОД ТЕЛЕФОНОМ</strong>
             <div id="qrContainer" class="qr-container"></div>
-            <div id="receiptShort" class="receipt-short"></div>
             <div class="print-instruction">
                 📱 1. Откройте приложение Fun Print<br>
                 📷 2. Нажмите "Сканировать QR"<br>
                 🖨️ 3. Наведите камеру на QR код<br>
                 ✅ 4. Нажмите "Печать"
             </div>
-            <button onclick="copyReceiptText()" style="background:#667eea; color:white; border:none; padding:10px; border-radius:8px; margin-top:10px; width:100%;">📋 Или скопировать полный текст</button>
+            <button onclick="copyReceiptText()" style="background:#667eea; color:white; border:none; padding:10px; border-radius:8px; margin-top:10px; width:100%;">📋 Скопировать чек</button>
         </div>
     </div>
 
@@ -319,22 +318,22 @@
         }, 500);
     }
     
-    // КОРОТКИЙ ЧЕК ДЛЯ QR КОДА (без лишних символов)
-    function generateShortReceiptText(receipt) {
-        let text = `ПВЗ ТЕРМИНАЛ\n`;
-        text += `${receipt.receiptId}\n`;
-        text += `${receipt.date}\n`;
-        text += `----------------\n`;
+    // СУПЕР-КОРОТКИЙ ЧЕК ДЛЯ QR (максимум 200 символов)
+    function generateMiniReceiptText(receipt) {
+        let items = receipt.items.map((item, idx) => {
+            let name = item.name.length > 12 ? item.name.substring(0, 10) + '.' : item.name;
+            return `${idx+1}.${name} ${Math.round(item.price)}р`;
+        }).join(' ');
         
-        receipt.items.forEach((item, idx) => {
-            // Обрезаем длинные названия
-            let shortName = item.name.length > 20 ? item.name.substring(0, 17) + '...' : item.name;
-            text += `${idx+1}.${shortName} ${item.price.toFixed(0)}р\n`;
-        });
+        let total = Math.round(receipt.total);
         
-        text += `----------------\n`;
-        text += `ИТОГО: ${receipt.total.toFixed(0)} руб.\n`;
-        text += `Спасибо!`;
+        // Формат: "ПВЗ|{id}|{total}|{items}"
+        let text = `ПВЗ|${receipt.receiptId.slice(-4)}|${total}|${items}`;
+        
+        // Если всё ещё длинный - обрезаем
+        if (text.length > 250) {
+            text = `ПВЗ|${receipt.receiptId.slice(-4)}|${total}|${receipt.items.length}тов`;
+        }
         
         return text;
     }
@@ -380,21 +379,19 @@
             return;
         }
         
-        // Короткий чек для QR
-        const shortReceiptText = generateShortReceiptText(receipt);
+        // Мини-чек для QR
+        const miniReceiptText = generateMiniReceiptText(receipt);
         
-        // Показываем короткий чек для проверки
-        const receiptShortDiv = document.getElementById('receiptShort');
-        receiptShortDiv.style.display = 'block';
-        receiptShortDiv.innerHTML = `<strong>Короткий чек (в QR):</strong><br><pre style="font-family:monospace; font-size:10px; margin-top:5px;">${shortReceiptText}</pre>`;
+        console.log('Длина текста для QR:', miniReceiptText.length, 'символов');
+        console.log('Текст:', miniReceiptText);
         
-        // Создаем QR код с коротким чеком
+        // Создаем QR код
         const qrContainer = document.getElementById('qrContainer');
         qrContainer.innerHTML = '';
         
         try {
             new QRCode(qrContainer, {
-                text: shortReceiptText,
+                text: miniReceiptText,
                 width: 250,
                 height: 250,
                 colorDark: "#000000",
@@ -403,8 +400,9 @@
             showNotification('✅ QR код создан! Отсканируйте телефоном', 'success');
         } catch(e) {
             console.error('QR error:', e);
-            qrContainer.innerHTML = '<div style="padding:20px; color:red;">⚠️ Ошибка создания QR кода</div>';
-            showNotification('❌ Ошибка создания QR кода', 'error');
+            // Если не получилось - показываем простой текст
+            qrContainer.innerHTML = `<div style="padding:20px; font-family:monospace; word-break:break-all;">${miniReceiptText}</div>`;
+            showNotification('⚠️ QR не создан, но текст чека на экране', 'admin');
         }
         
         const printSection = document.getElementById('printSection');
@@ -438,7 +436,6 @@
         localStorage.removeItem('currentCart');
         document.getElementById('printSection').classList.remove('show');
         document.getElementById('qrContainer').innerHTML = '';
-        document.getElementById('receiptShort').style.display = 'none';
         saveData();
         showNotification('🆕 Новая покупка! Можете сканировать товары', 'success');
         speak("Новая покупка");
